@@ -5,6 +5,22 @@ from itertools import product, combinations
 import json
 from pathlib import Path
 from typing import ClassVar
+import sys
+import atexit
+class Tee:
+    """Writes console output to both the console and a log file."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for stream in self.streams:
+            stream.write(text)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
 # artifact_data.py
 VESNA_MAIN_STATS = {
     "flower": {"stat": "HP", "value": 4780},
@@ -1854,6 +1870,10 @@ def find_best_dps_profile(profiles, line_type, team_config):
     print()
 
     constellations = team_config["constellations"]
+    print("DEBUG team_config:", team_config)
+    print("DEBUG team_name:", team_config.get("team_name"))
+    print("DEBUG config_name:", team_config.get("name"))
+    print("DEBUG members:", team_config.get("members"))
 
     print("\n" + "=" * 60)
     print("BEST ARTIFACT PROFILE")
@@ -1868,7 +1888,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
     print(f"Line Type: {line_type}")
     print(f"Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): {best_profile}")
     print(f"Maximum Rotation Damage: {best_dps * rotation_time:,.2f}")
-    print(f"Maximum DPS: {best_dps:,.2f}")
+    print(f"Maximum Vesna DPS: {best_dps:,.2f}")
 
     if best_profile is not None:
         (
@@ -1914,8 +1934,6 @@ def find_best_dps_profile(profiles, line_type, team_config):
 
     
         # Team damage calculation
-    
-
         vesna_rotation_damage = (
             best_vesna.calculate_total_vesna_damage()
         )
@@ -1923,8 +1941,6 @@ def find_best_dps_profile(profiles, line_type, team_config):
 
     
         # Odette - Stellar damage
-    
-
         odette_on_field_stellar = (
             best_vesna.odette_on_field_Coda_stellar_swirl_damage
             + best_vesna.odette_plume_hits
@@ -1942,16 +1958,18 @@ def find_best_dps_profile(profiles, line_type, team_config):
         )
 
     
-        # Odette - Cryo damage
-    
-        # Cryo damage is not included until the correct existing
-        # Cryo damage properties have been connected.
-
+        # Odette - Cryo damage    
         print("\n" + "-" * 60)
         print("ODETTE DAMAGE BREAKDOWN")
         print("-" * 60)
-        print(f"On-Field Stellar Damage:  {odette_on_field_stellar:,.2f}")
-        print(f"Off-Field Stellar Damage: {odette_off_field_stellar:,.2f}")
+
+        if "odette" in members:
+            print(f"On-Field Stellar Damage:  {odette_on_field_stellar:,.2f}")
+            print(f"Off-Field Stellar Damage: {odette_off_field_stellar:,.2f}")
+        else:
+            print(f"On-Field Stellar Damage:  {0.0:,.2f}")
+            print(f"Off-Field Stellar Damage: {0.0:,.2f}")
+
         print("-" * 60)
 
         # Currently includes Stellar damage only.
@@ -1959,7 +1977,6 @@ def find_best_dps_profile(profiles, line_type, team_config):
             odette_on_field_stellar
             + odette_off_field_stellar
         )
-
         odette_dps = odette_rotation_damage / rotation_time
 
     
@@ -1972,6 +1989,15 @@ def find_best_dps_profile(profiles, line_type, team_config):
 
     
         # Total team damage
+        members = set(team_config["members"])
+
+        vesna_dps = vesna_dps if "vesna" in members else 0.0
+        odette_dps = odette_dps if "odette" in members else 0.0
+        diona_dps_value = diona_dps_value if "diona" in members else 0.0
+        faruzan_dps_value = faruzan_dps_value if "faruzan" in members else 0.0
+        sucrose_dps_value = sucrose_dps_value if "sucrose" in members else 0.0
+        vodyanitsa_flat_dps = vodyanitsa_flat_dps if "vodyanitsa" in members else 0.0
+
         team_dps = (
             vesna_dps
             + odette_dps
@@ -1980,20 +2006,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
             + sucrose_dps_value
             + vodyanitsa_flat_dps
         )
-
         team_rotation_damage = team_dps * rotation_time
-
-        expected_team_rotation_damage = (
-            vesna_rotation_damage
-            + odette_rotation_damage
-            + (
-                diona_dps_value
-                + faruzan_dps_value
-                + sucrose_dps_value
-                + vodyanitsa_flat_dps
-            ) * rotation_time
-        )
-
     
         # Final report
         print("TEAM DAMAGE BREAKDOWN")
@@ -2018,6 +2031,11 @@ def find_best_dps_profile(profiles, line_type, team_config):
 
 # 13. PROGRAM ENTRY POINT – OUTSIDE THE CLASS
 if __name__ == "__main__":
+    log_path = Path(__file__).with_name("vesna_calc.log")
+    log_file = log_path.open("w", encoding="utf-8")
+
+    sys.stdout = Tee(sys.stdout, log_file)
+    atexit.register(log_file.close)
     calculator = VesnaTeamDPSTheorie()
     line_type = "3_line"
 
