@@ -143,7 +143,7 @@ def build_artifact_map(line_type):
 
     for slot, artifact in VESNA_MAIN_STATS.items():
         main_stat = artifact["stat"]
-
+        
         artifact_map[slot] = {
             "main_stat": main_stat,
             "main_value": artifact["value"],
