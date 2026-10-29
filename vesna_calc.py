@@ -420,7 +420,6 @@ class VesnaTeamDPSTheorie:
     stellar_anemo_mv: float = 3633.00
 
     vesna_talent_stellar_damage_bonus: float = 14
-    stellar_quills_flat_damage_without_vodya: float = 0
 
     e_stellar_mv: float = 72
     se1_stellar_mv: float = 72
@@ -651,7 +650,7 @@ class VesnaTeamDPSTheorie:
     # not running ToM will result in slightly lower numbers, but there is less headache about calculating uptimes for different artifact set combinations in different teams
     # this whole stuff might be added in the future
     vodyanitsa_HP_value: float = 65000.0
-    vodyanitsa_stellar_quills_flat_damage: float = 6500.0
+    vodyanitsa_stellar_quills_active: float = 6500.0
     vodyanitsa_flat_dps: float = 750.0
     em_vesna_talent_a3_vodyanitsa: float = 25
 
@@ -673,7 +672,7 @@ class VesnaTeamDPSTheorie:
     @property
     def active_vodyanitsa_stellar_quills_flat_damage(self) -> float:
         if self.is_vodyanitsa_active:
-            return self.vodyanitsa_stellar_quills_flat_damage
+            return self.vodyanitsa_stellar_quills_active
         return 0.0
 
     # 5. DIONA – C6
@@ -730,12 +729,10 @@ class VesnaTeamDPSTheorie:
     #Stats from artifacts
     lumine_2p2p_atk_artifact_set_bonus: float = 36.0
     lumine_feather_flat_atk_bonus: float = 311
-    lumine_base_atk_total: float = lumine_base_atk + lumine_sig_base_atk
     lumine_artifact_sands_atk_value:float = 46.6
     lumine_artifact_goblet_atk_value:float = 46.6
     lumine_artifact_circlet_cd_value:float = 62.2
 
-    lumine_total_CR: float = 85.0
     lumine_total_em: float = 8*ARTIFACT_SUBSTATS["EM"]["average"]+ lumine_base_em_value
     lumine_total_CD: float = 10*ARTIFACT_SUBSTATS["CD%"]["average"] + lumine_sig_CD_value + lumine_artifact_circlet_cd_value
 
@@ -1009,7 +1006,6 @@ class VesnaTeamDPSTheorie:
         show("Team ATK% bonus", self.team_atk_percent_buff)
         show("Flat ATK from Feather", self.vesna_flat_atk_feather)
         show("Other flat ATK", self.flat_attack_value)
-        show("Team flat ATK", self.team_atk_flat_buff)
         show("Total ATK", self.vesna_total_atk_value)
 
         section("STELLAR DAMAGE")
@@ -1039,8 +1035,7 @@ class VesnaTeamDPSTheorie:
         show("Cryo RES reduction – Odette C2", self.odette_C2_cryo_res_reduction)
         show("Cryo RES reduction – Faruzan VV", self.faruzan_VV_set_cryo_res_reduction)
         show("Total Cryo RES reduction", self.vesna_cryo_res_reduction)
-        show("Anemo RES multiplier (10% base RES)",self.calculate_res_multiplier(10.0, self.vesna_anemo_res_reduction),)
-        show("Cryo RES multiplier (10% base RES)",self.calculate_res_multiplier(10.0, self.vesna_cryo_res_reduction),)
+
 
         section("DAMAGE BREAKDOWN")
         show("Anemo damage", self.calculate_anemo_damage_lv95())
@@ -1065,10 +1060,7 @@ class VesnaTeamDPSTheorie:
         vortex_damage_bonus = (
             1.0 + (self.vesna_talent_stellar_damage_bonus+ self.active_odette_talent_stellar_damage_bonus) / 100.0)
 
-        vortex_res_multiplier = self.calculate_res_multiplier(
-            10.0,
-            self.vesna_cryo_res_reduction,
-        )
+        vortex_res_multiplier = self.calculate_cryo_res_multiplier()
 
         section("ODETTE – DAMAGE BREAKDOWN")
 
@@ -1126,7 +1118,6 @@ class VesnaTeamDPSTheorie:
             * (1.0 + total_atk_percent / 100.0)
             + self.vesna_flat_atk_feather
             + self.flat_attack_value
-            + self.team_atk_flat_buff
         )
 
     @property
@@ -1326,14 +1317,11 @@ class VesnaTeamDPSTheorie:
                             + self.active_odette_talent_stellar_damage_bonus
                         ) / 100.0
                     )
-                    + self.active_vodyanitsa_stellar_quills_flat_damage
+                    + self.vodyanitsa_stellar_quills_active
                 )
                 * self.stellar_crit_multiplier
             )
-            * self.calculate_res_multiplier(
-                10.0,
-                self.vesna_anemo_res_reduction,
-            )
+            * self.calculate_anemo_res_multiplier()
         )
     def calculate_vortex_proc_damage(self, level: int) -> float:
         if level == 90:
@@ -1354,12 +1342,9 @@ class VesnaTeamDPSTheorie:
                         + self.active_odette_talent_stellar_damage_bonus
                     ) / 100.0
                 )
-                + self.active_vodyanitsa_stellar_quills_flat_damage
+                + self.vodyanitsa_stellar_quills_active
             )
-            * self.calculate_res_multiplier(
-                10.0,
-                self.vesna_cryo_res_reduction,
-            )
+            * self.calculate_cryo_res_multiplier()
         )
     def calculate_vortex_explosion_damage(self, level: int) -> float:
         if level == 90:
@@ -1380,13 +1365,11 @@ class VesnaTeamDPSTheorie:
                         + self.active_odette_talent_stellar_damage_bonus
                     ) / 100.0
                 )
-                + self.active_vodyanitsa_stellar_quills_flat_damage
+                + self.vodyanitsa_stellar_quills_active
             )
-            * self.calculate_res_multiplier(
-                10.0,
-                self.vesna_cryo_res_reduction,
-            )
-        )
+            * self.calculate_cryo_res_multiplier()
+         )
+  
     def calculate_vesna_total_vortex_damage(self, level: int) -> float:
         return (
             self.calculate_vortex_proc_damage(level) * self.vortex_procs
@@ -1418,27 +1401,26 @@ class VesnaTeamDPSTheorie:
         self,mv: float,atk: float,em_multiplier: float,crit_multiplier: float = 0.0,) -> float:
         cryo_resistance_multiplier = self.calculate_cryo_res_multiplier()
 
-        damage = (atk * (mv / 100.0) * em_multiplier + self.active_vodyanitsa_stellar_quills_flat_damage)
+        damage = (atk * (mv / 100.0) * em_multiplier + self.vodyanitsa_stellar_quills_active)
 
         return damage * crit_multiplier * cryo_resistance_multiplier
 
     # 11.1 ON-FIELD – Coda Finisher Hit
     @property
     def odette_on_field_Coda_stellar_swirl_damage(self) -> float:
-        quills = (self.active_vodyanitsa_stellar_quills_flat_damage * 2 if self.is_vodyanitsa_active else 0.0)
+        quills = (self.vodyanitsa_stellar_quills_active * 2 if self.is_vodyanitsa_active else 0.0)
         return self.calculate_odette_stellar_damage(
             mv=self.odette_Coda_stellar_swirl_mv,
             atk=self.odette_on_field_atk,
             em_multiplier=self.odette_em_multiplier,
             crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
     # 11.2 ON-FIELD – Stellar Plume Hits
     @property
     def odette_on_field_plume_stellar_swirl_damage(self) -> float:
         quills = (
-            self.active_vodyanitsa_stellar_quills_flat_damage * 2
+            self.vodyanitsa_stellar_quills_active * 2
             if self.is_vodyanitsa_active
             else 0.0
         )
@@ -1448,14 +1430,13 @@ class VesnaTeamDPSTheorie:
             atk=self.odette_on_field_atk,
             em_multiplier=self.odette_em_multiplier,
             crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
     # 11.3 ON-FIELD – Stellar Wing Hits
     @property
     def odette_on_field_wing_stellar_swirl_damage(self) -> float:
         quills = (
-            self.active_vodyanitsa_stellar_quills_flat_damage * 2
+            self.vodyanitsa_stellar_quills_active * 2
             if self.is_vodyanitsa_active
             else 0.0
         )
@@ -1465,7 +1446,6 @@ class VesnaTeamDPSTheorie:
             atk=self.odette_on_field_atk,
             em_multiplier=self.odette_em_multiplier,
             crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
 
@@ -1475,7 +1455,7 @@ class VesnaTeamDPSTheorie:
     @property
     def odette_off_field_Coda_stellar_swirl_damage(self) -> float:
         quills = (
-            self.active_vodyanitsa_stellar_quills_flat_damage * 2
+            self.vodyanitsa_stellar_quills_active * 2
             if self.is_vodyanitsa_active
             else 0.0
         )
@@ -1485,14 +1465,13 @@ class VesnaTeamDPSTheorie:
             atk=self.odette_off_field_atk,
             em_multiplier=self.odette_off_field_em_multiplier,
             crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
 
     @property
     def odette_off_field_plume_stellar_swirl_damage(self) -> float:
         quills = (
-            self.active_vodyanitsa_stellar_quills_flat_damage * 2
+            self.vodyanitsa_stellar_quills_active * 2
             if self.is_vodyanitsa_active
             else 0.0
         )
@@ -1502,14 +1481,13 @@ class VesnaTeamDPSTheorie:
             atk=self.odette_off_field_atk,
             em_multiplier=self.odette_off_field_em_multiplier,
             crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
 
     @property
     def odette_off_field_wing_stellar_swirl_damage(self) -> float:
         quills = (
-            self.active_vodyanitsa_stellar_quills_flat_damage * 2
+            self.vodyanitsa_stellar_quills_active * 2
             if self.is_vodyanitsa_active
             else 0.0
         )
@@ -1519,7 +1497,6 @@ class VesnaTeamDPSTheorie:
             atk=self.odette_off_field_atk,
             em_multiplier=self.odette_off_field_em_multiplier,
             crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-            flat_damage=quills,
         )
 
     # 12. TEAM CONFIGURATIONS AND CONSTELLATIONS
