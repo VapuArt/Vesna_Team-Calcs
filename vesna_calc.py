@@ -2320,6 +2320,14 @@ def find_best_dps_profile(profiles, line_type, team_config):
             * best_vesna.odette_off_field_wing_stellar_swirl_damage
         )
 
+        # Lumine - Cryo and Stellar damage
+        lumine_rotation_damage = (
+            best_vesna.lumine_stellar_charge_attack_damage
+            + best_vesna.lumine_e_skill_cryo_damage_on_field
+            + best_vesna.lumine_e_skill_cryo_damage_off_field
+            + best_vesna.lumine_ultimate_q_stellar_damage
+        )
+
         print("\n" + "-" * 60)
         print("ODETTE DAMAGE BREAKDOWN")
         print("-" * 60)
@@ -2338,6 +2346,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
             + odette_off_field_stellar
         )
         odette_dps = odette_rotation_damage / rotation_time
+        lumine_dps = lumine_rotation_damage / rotation_time
 
         # DPS contributions from other team members
         diona_dps_value = 5000.0 if "diona" in members else 0.0
@@ -2345,17 +2354,11 @@ def find_best_dps_profile(profiles, line_type, team_config):
         sucrose_dps_value = 2500.0 if "sucrose" in members else 0.0
         vodyanitsa_flat_dps = 750.0 if "vodyanitsa" in members else 0.0
 
-        # Lumine - total rotation damage and DPS
-        if "lumine" in members:
-            lumine_rotation_damage = best_vesna.lumine_rotation_damage
-            lumine_dps_value = lumine_rotation_damage / rotation_time
-        else:
-            lumine_rotation_damage = 0.0
-            lumine_dps_value = 0.0
 
         # Total team damage
         vesna_dps = vesna_dps if "vesna" in members else 0.0
         odette_dps = odette_dps if "odette" in members else 0.0
+        lumine_dps = lumine_dps if "lumine" in members else 0.0
 
         team_dps = (
             vesna_dps
@@ -2364,7 +2367,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
             + faruzan_dps_value
             + sucrose_dps_value
             + vodyanitsa_flat_dps
-            + lumine_dps_value
+            + lumine_dps
         )
         team_rotation_damage = team_dps * rotation_time
     
@@ -2377,7 +2380,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
         print(f"Odette Stellar Damage:      {odette_rotation_damage:,.2f}")
         print(f"Odette DPS:                 {odette_dps:,.2f}")
         print(f"Lumine Rotation Damage:     {lumine_rotation_damage:,.2f}")
-        print(f"Lumine DPS:                 {lumine_dps_value:,.2f}")
+        print(f"Lumine DPS:                 {lumine_dps:,.2f}")
         print(f"Diona DPS:                  {diona_dps_value:,.2f}")
         print(f"Faruzan DPS:                {faruzan_dps_value:,.2f}")
         print(f"Sucrose DPS:                {sucrose_dps_value:,.2f}")
