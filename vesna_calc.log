@@ -1,227 +1,454 @@
-
-=== Loading Combined Artifact Profiles ===
 Profile cache loaded: vesna_profiles_v1_3_line.json (15,985 profiles)
 
-Total Artifact Profiles: 15,985
-
-=== Starting Team Optimization ===
-
 ============================================================
-Configuration 1/9
-Profiles to evaluate: 15,985
-
-
-============================================================
-BEST ARTIFACT PROFILE
-============================================================
-Team: Vesna_Odette_Faruzan_Diona
-Configuration: Team_Comp_001_calced | Vesna C0 | Odette C0 | Vodyanitsa C0
-Line Type: 3_line
-Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
-Maximum Rotation Damage: 3,925,282.79
-Maximum Vesna DPS: 201,296.55
-=== VESNA RES DEBUG ===
-Odette Constellation: 0
-Anemo RES Multiplier: 1.1
-Coda: 289549.2731375326
-Plume total: 127930.58854934893
-Wing total: 152990.6037703249
-Off-Field total: 570470.4654572064
-Off-Field ATK: 2888.4
-Odette EM: 103.0
-Off-Field Stellar Multiplier: 3.2945483594864475
-Odette Crit Multiplier: 3.205
-Cryo RES Multiplier: 1.15
+Configuration 1/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
 
 ------------------------------------------------------------
-ODETTE DAMAGE BREAKDOWN
+CHARACTER CONSTELLATIONS
 ------------------------------------------------------------
-On-Field Stellar Damage: 383,065.08
-On-Field Cryo Damage:    39,622.54
-On-Field Total Damage:   422,687.62
-------------------------------------------------------------
+Vesna: C0
+Odette: C0
+Vodyanitsa: C0
 
 ------------------------------------------------------------
-DEBUG ARTIFACT SET ASSIGNMENTS
+ARTIFACT SET ASSIGNMENTS
 ------------------------------------------------------------
 furnace: odette
 noblesse: no holder
-tom: diona
+tom: vodyanitsa
 vv: faruzan
 atk_2p2p: no holder
-instructor: sucrose
-------------------------------------------------------------
-TEAM DAMAGE BREAKDOWN
-------------------------------------------------------------
-Rotation Duration:          19.50 s
-Vesna Rotation Damage:      3,925,282.79
-Vesna DPS:                  201,296.55
-Odette Total Damage:        1,173,620.59
-Odette DPS:                 60,185.67
+instructor: no holder
 
 ------------------------------------------------------------
-LUMINE DAMAGE BREAKDOWN
+BEST ARTIFACT PROFILE
 ------------------------------------------------------------
-Stellar Charge Attack Damage:  0.00
-E-Skill Cryo Damage On-Field:  0.00
-E-Skill Cryo Damage Off-Field: 0.00
-Ultimate Q Stellar Damage:     0.00
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
 ------------------------------------------------------------
-Total Lumine Rotation Damage:  0.00
-Lumine DPS:                    0.00
-Diona DPS:                  5,000.00
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      4,599,788.25
+Vesna DPS:                  235,886.58
+
+Odette Total Damage:        2,062,962.25
+Odette DPS:                 105,792.94
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
 Faruzan DPS:                15,000.00
 Sucrose DPS:                0.00
-Vodyanitsa DPS:             0.00
+Vodyanitsa DPS:             750.00
+
 ------------------------------------------------------------
-Total Team Rotation Damage: 5,488,903.38
-TOTAL TEAM DPS:             281,482.22
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 6,969,875.51
+TOTAL TEAM DPS:             357,429.51
 ============================================================
 
 ============================================================
-Configuration 2/9
-Profiles to evaluate: 15,985
-
-
-============================================================
-BEST ARTIFACT PROFILE
-============================================================
-Team: Vesna_Odette_Faruzan_Diona
-Configuration: Team_Comp_002_calced | Vesna C0 | Odette C1 | Vodyanitsa C0
-Line Type: 3_line
-Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
-Maximum Rotation Damage: 4,202,349.12
-Maximum Vesna DPS: 215,505.08
-=== VESNA RES DEBUG ===
-Odette Constellation: 1
-Anemo RES Multiplier: 1.1
-Coda: 289549.2731375326
-Plume total: 127930.58854934893
-Wing total: 152990.6037703249
-Off-Field total: 570470.4654572064
-Off-Field ATK: 2888.4
-Odette EM: 103.0
-Off-Field Stellar Multiplier: 3.2945483594864475
-Odette Crit Multiplier: 3.205
-Cryo RES Multiplier: 1.15
+Configuration 2/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
 
 ------------------------------------------------------------
-ODETTE DAMAGE BREAKDOWN
+CHARACTER CONSTELLATIONS
 ------------------------------------------------------------
-On-Field Stellar Damage: 647,815.21
-On-Field Cryo Damage:    39,622.54
-On-Field Total Damage:   687,437.75
-------------------------------------------------------------
+Vesna: C0
+Odette: C0
+Vodyanitsa: C1
 
 ------------------------------------------------------------
-DEBUG ARTIFACT SET ASSIGNMENTS
+ARTIFACT SET ASSIGNMENTS
 ------------------------------------------------------------
 furnace: odette
 noblesse: no holder
-tom: diona
+tom: vodyanitsa
 vv: faruzan
 atk_2p2p: no holder
-instructor: sucrose
-------------------------------------------------------------
-TEAM DAMAGE BREAKDOWN
-------------------------------------------------------------
-Rotation Duration:          19.50 s
-Vesna Rotation Damage:      4,202,349.12
-Vesna DPS:                  215,505.08
-Odette Total Damage:        1,455,428.39
-Odette DPS:                 74,637.35
+instructor: no holder
 
 ------------------------------------------------------------
-LUMINE DAMAGE BREAKDOWN
+BEST ARTIFACT PROFILE
 ------------------------------------------------------------
-Stellar Charge Attack Damage:  0.00
-E-Skill Cryo Damage On-Field:  0.00
-E-Skill Cryo Damage Off-Field: 0.00
-Ultimate Q Stellar Damage:     0.00
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
 ------------------------------------------------------------
-Total Lumine Rotation Damage:  0.00
-Lumine DPS:                    0.00
-Diona DPS:                  5,000.00
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      5,117,887.49
+Vesna DPS:                  262,455.77
+
+Odette Total Damage:        2,229,053.05
+Odette DPS:                 114,310.41
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
 Faruzan DPS:                15,000.00
 Sucrose DPS:                0.00
-Vodyanitsa DPS:             0.00
+Vodyanitsa DPS:             750.00
+
 ------------------------------------------------------------
-Total Team Rotation Damage: 6,047,777.51
-TOTAL TEAM DPS:             310,142.44
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 7,654,065.55
+TOTAL TEAM DPS:             392,516.18
 ============================================================
 
 ============================================================
-Configuration 3/9
-Profiles to evaluate: 15,985
-
-
-============================================================
-BEST ARTIFACT PROFILE
-============================================================
-Team: Vesna_Odette_Faruzan_Diona
-Configuration: Team_Comp_003_calced | Vesna C0 | Odette C2 | Vodyanitsa C0
-Line Type: 3_line
-Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
-Maximum Rotation Damage: 4,718,081.69
-Maximum Vesna DPS: 241,952.91
-=== VESNA RES DEBUG ===
-Odette Constellation: 2
-Anemo RES Multiplier: 1.1
-Coda: 314727.47080166586
-Plume total: 139054.98755364015
-Wing total: 166294.13453296188
-Off-Field total: 620076.592888268
-Off-Field ATK: 2888.4
-Odette EM: 103.0
-Off-Field Stellar Multiplier: 3.2945483594864475
-Odette Crit Multiplier: 3.205
-Cryo RES Multiplier: 1.25
+Configuration 3/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
 
 ------------------------------------------------------------
-ODETTE DAMAGE BREAKDOWN
+CHARACTER CONSTELLATIONS
 ------------------------------------------------------------
-On-Field Stellar Damage: 787,843.49
-On-Field Cryo Damage:    48,187.14
-On-Field Total Damage:   836,030.63
-------------------------------------------------------------
+Vesna: C0
+Odette: C0
+Vodyanitsa: C2
 
 ------------------------------------------------------------
-DEBUG ARTIFACT SET ASSIGNMENTS
+ARTIFACT SET ASSIGNMENTS
 ------------------------------------------------------------
 furnace: odette
 noblesse: no holder
-tom: diona
+tom: vodyanitsa
 vv: faruzan
 atk_2p2p: no holder
-instructor: sucrose
-------------------------------------------------------------
-TEAM DAMAGE BREAKDOWN
-------------------------------------------------------------
-Rotation Duration:          19.50 s
-Vesna Rotation Damage:      4,718,081.69
-Vesna DPS:                  241,952.91
-Odette Total Damage:        1,661,046.00
-Odette DPS:                 85,181.85
+instructor: no holder
 
 ------------------------------------------------------------
-LUMINE DAMAGE BREAKDOWN
+BEST ARTIFACT PROFILE
 ------------------------------------------------------------
-Stellar Charge Attack Damage:  0.00
-E-Skill Cryo Damage On-Field:  0.00
-E-Skill Cryo Damage Off-Field: 0.00
-Ultimate Q Stellar Damage:     0.00
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
 ------------------------------------------------------------
-Total Lumine Rotation Damage:  0.00
-Lumine DPS:                    0.00
-Diona DPS:                  5,000.00
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      5,788,470.13
+Vesna DPS:                  296,844.62
+
+Odette Total Damage:        2,373,332.84
+Odette DPS:                 121,709.38
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
 Faruzan DPS:                15,000.00
 Sucrose DPS:                0.00
-Vodyanitsa DPS:             0.00
+Vodyanitsa DPS:             750.00
+
 ------------------------------------------------------------
-Total Team Rotation Damage: 6,769,127.69
-TOTAL TEAM DPS:             347,134.75
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 8,468,927.97
+TOTAL TEAM DPS:             434,304.00
 ============================================================
 
 ============================================================
-Configuration 4/9
-Profiles to evaluate: 15,985
+Configuration 4/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C1
+Vodyanitsa: C0
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      4,910,843.96
+Vesna DPS:                  251,838.15
+
+Odette Total Damage:        2,393,729.75
+Odette DPS:                 122,755.37
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 7,611,698.71
+TOTAL TEAM DPS:             390,343.52
+============================================================
+
+============================================================
+Configuration 5/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C1
+Vodyanitsa: C1
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      5,472,060.60
+Vesna DPS:                  280,618.49
+
+Odette Total Damage:        2,603,406.96
+Odette DPS:                 133,508.05
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 8,382,592.55
+TOTAL TEAM DPS:             429,876.54
+============================================================
+
+============================================================
+Configuration 6/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C1
+Vodyanitsa: C2
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      6,189,722.46
+Vesna DPS:                  317,421.66
+
+Odette Total Damage:        2,751,348.57
+Odette DPS:                 141,094.80
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 9,248,196.03
+TOTAL TEAM DPS:             474,266.46
+============================================================
+
+============================================================
+Configuration 7/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C2
+Vodyanitsa: C0
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      5,395,137.43
+Vesna DPS:                  276,673.71
+
+Odette Total Damage:        2,643,143.49
+Odette DPS:                 135,545.82
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 8,345,405.92
+TOTAL TEAM DPS:             427,969.53
+============================================================
+
+============================================================
+Configuration 8/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C2
+Vodyanitsa: C1
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      5,956,354.07
+Vesna DPS:                  305,454.05
+
+Odette Total Damage:        2,868,949.71
+Odette DPS:                 147,125.63
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 9,132,428.78
+TOTAL TEAM DPS:             468,329.68
+============================================================
+
+============================================================
+Configuration 9/228
+TEAM OVERVIEW
+Team: Vesna_Odette_Vodyanitsa_Faruzan
+
+------------------------------------------------------------
+CHARACTER CONSTELLATIONS
+------------------------------------------------------------
+Vesna: C0
+Odette: C2
+Vodyanitsa: C2
+
+------------------------------------------------------------
+ARTIFACT SET ASSIGNMENTS
+------------------------------------------------------------
+furnace: odette
+noblesse: no holder
+tom: vodyanitsa
+vv: faruzan
+atk_2p2p: no holder
+instructor: no holder
+
+------------------------------------------------------------
+BEST ARTIFACT PROFILE
+------------------------------------------------------------
+(ATK, ATK%, CD%, EM, CR%, ER%): (1, 3, 15, 5, 14, 2)
+
+------------------------------------------------------------
+CHARACTER DAMAGE BREAKDOWN
+------------------------------------------------------------
+Vesna Rotation Damage:      6,736,937.60
+Vesna DPS:                  345,483.98
+
+Odette Total Damage:        3,024,424.19
+Odette DPS:                 155,098.68
+
+Lumine DPS:                 0.00
+Diona DPS:                  0.00
+Faruzan DPS:                15,000.00
+Sucrose DPS:                0.00
+Vodyanitsa DPS:             750.00
+
+------------------------------------------------------------
+TEAM DAMAGE
+------------------------------------------------------------
+Rotation Duration:          19.50 s
+Total Team Rotation Damage: 10,068,486.79
+TOTAL TEAM DPS:             516,332.66
+============================================================
+
+============================================================
+Configuration 10/228

@@ -1,14 +1,10 @@
-from ast import Set
 from dataclasses import dataclass, field
-from encodings import raw_unicode_escape
 from itertools import product, combinations
 import json
-from os import listvolumes
 from pathlib import Path
 from typing import ClassVar
 import sys
 import atexit
-from xml.sax.handler import property_declaration_handler
 class Tee:
     """Writes console output to both the console and a log file."""
 
@@ -326,13 +322,19 @@ class VesnaTeamDPSTheorie:
         # 7. Instructor
         # --------------------------------------------------
 
+        instructor_holder = (
+            "sucrose"
+            if self.is_sucrose_active and furnace_holder != "sucrose"
+            else None
+        )
+
         buffs["instructor"] = {
-            "holder": "sucrose" if furnace_holder != "sucrose" else None,
-            "uptime": 0.8 if self.is_odette_active and furnace_holder != "sucrose" else 0.0,
-            "rotation_duration": 20.0 if self.is_odette_active and furnace_holder != "sucrose" else None,
+            "holder": instructor_holder,
+            "uptime": 0.8 if self.is_odette_active and instructor_holder is not None else 0.0,
+            "rotation_duration": 20.0 if self.is_odette_active and instructor_holder is not None else None,
             "conditions": {
                 # The rotation switches to Sucrose twice before Odette and Vesna.
-                "odette_and_vesna_uptime_80_percent": True,
+                "odette_and_vesna_uptime_80_percent": instructor_holder is not None,
             },
         }
 
@@ -639,7 +641,7 @@ class VesnaTeamDPSTheorie:
     # 2. VESNA – character stats and MV
     vesna_level_90: int = 90
     vesna_level_95: int = 95
-    level: int = 95 #change lv 90 / 95 / 100 to evaluate which level Vesna is
+    level: int = 90 #change lv 90 / 95 / 100 to evaluate which level Vesna is
     base_atk_lv_90: float = 1028
     base_atk_lv_95: float = 1068
     vesna_flat_atk_feather: float = 311
@@ -763,7 +765,20 @@ class VesnaTeamDPSTheorie:
         return self.team_atk_percent_artifact_and_other_bonus
     @property
     def odette_on_field_atk(self) -> float:
-        return self.odette_atk + self.odette_base_atk * self.odette_atk_percent_value
+        vodyanitsa_c1_bonus = (
+            self.vodyanitsa_C1_flat_atk_bonus
+            if (
+                self.is_vodyanitsa_active
+                and self.vodyanitsa_constellation >= 1
+            )
+            else 0.0
+        )
+
+        return (
+            self.odette_atk
+            + self.odette_base_atk * self.odette_atk_percent_value
+            + vodyanitsa_c1_bonus
+        )
     @property
     def odette_off_field_atk_percent_value(self) -> float:
         buff = 0.0
@@ -779,9 +794,19 @@ class VesnaTeamDPSTheorie:
         return buff / 100.0
     @property
     def odette_off_field_atk(self) -> float:
+        vodyanitsa_c1_bonus = (
+            self.vodyanitsa_C1_flat_atk_bonus
+            if (
+                self.is_vodyanitsa_active
+                and self.vodyanitsa_constellation >= 1
+            )
+            else 0.0
+        )
+
         return (
             self.odette_atk
             + self.odette_base_atk * self.odette_off_field_atk_percent_value
+            + vodyanitsa_c1_bonus
         )
     @property
     def odette_effective_cr(self) -> float:
@@ -950,6 +975,7 @@ class VesnaTeamDPSTheorie:
     vodyanitsa_anemo_res_reduction: float = 35.0
     vodyanitsa_cryo_res_reduction: float = 30.0
     vodyanitsa_signature_atk_bonus: float = 42.0
+    vodyanitsa_C1_flat_atk_bonus: float = 520.0
     vodyanitsa_C2_stellar_reaction_cd_bonus: float = 60.0
 
     @property
@@ -978,7 +1004,7 @@ class VesnaTeamDPSTheorie:
     faruzan_VV_set_cryo_res_reduction: float = 40.0
 
     faruzan_breezeborne_r1_stellar_damage_bonus: float = 24.0
-    faruzan_breezeborne_r5_stellar_damage_bonus: float = 48.0
+    faruzan_breezeborne_r5_stellar_damage_bonus: float = 24.0 # auf r1
 
 
     # 7. SUCROSE – C6
@@ -1064,6 +1090,8 @@ class VesnaTeamDPSTheorie:
 
     @property
     def lumine_total_atk(self) -> float:
+        vodyanitsa_c1_bonus = (self.vodyanitsa_C1_flat_atk_bonus if (self.is_vodyanitsa_active and self.vodyanitsa_constellation >= 1) else 0.0)
+
         return (
             self.lumine_base_atk_total
             * (
@@ -1078,6 +1106,7 @@ class VesnaTeamDPSTheorie:
                 ) / 100.0
             )
             + self.lumine_feather_flat_atk_bonus
+            + vodyanitsa_c1_bonus
         )
 
     @property
@@ -1122,10 +1151,7 @@ class VesnaTeamDPSTheorie:
     #Damage Calc for E-Skill off-field
     @property
     def lumine_e_skill_cryo_damage_off_field(self) -> float:
-        damage_per_tick = (
-            self.lumine_total_atk
-            * (self.lumine_mv_E_Skill_off_field_periodic_mv_value / 100.0)
-        )
+        damage_per_tick = (self.lumine_total_atk* (self.lumine_mv_E_Skill_off_field_periodic_mv_value / 100.0))
 
         return (
             damage_per_tick
@@ -1197,11 +1223,15 @@ class VesnaTeamDPSTheorie:
 
     @property
     def vesna_total_atk_value(self) -> float:
+        vodyanitsa_c1_bonus = (self.vodyanitsa_C1_flat_atk_bonus
+            if (self.is_vodyanitsa_active and self.vodyanitsa_constellation >= 1) else 0.0)
+
         return (
             self.vesna_base_atk_value
             * (1.0 + self.vesna_atk_percent_value)
             + self.vesna_flat_atk_feather
             + self.flat_attack_value
+            + vodyanitsa_c1_bonus
         )
 
     @property
@@ -1221,15 +1251,6 @@ class VesnaTeamDPSTheorie:
             + self.crit_damage
             + self.weapon_proc_crit_damage
         )
-
-    @property
-    def vesna_stellar_crit_multiplier(self) -> float:
-        crit_damage = (self.vesna_crit_damage_value + self.vodyanitsa_C2_stellar_reaction_cd_bonus)
-
-        if self.is_faruzan_active:
-            crit_damage += self.faruzan_c6_anemo_crit_damage
-
-        return 1.0 + crit_damage / 100.0
 
     @property
     def vesna_anemo_crit_multiplier(self) -> float:
@@ -1363,8 +1384,8 @@ class VesnaTeamDPSTheorie:
 
         return (
             damage
-            * self.calculate_stellar_crit_multiplier("vesna", "cryo")
-            * self.calculate_cryo_res_multiplier
+            * self.calculate_stellar_crit_multiplier("vesna", "anemo")
+            * self.calculate_anemo_res_multiplier
         )
     def calculate_vortex_explosion_damage(self) -> float:
         if self.level == self.vesna_level_90:
@@ -1377,24 +1398,28 @@ class VesnaTeamDPSTheorie:
         damage = (
             level_modifier
             * 3.0
-            * 0.6
-            * self.calculate_stellar_damage_multiplier("vesna")
+            * 0.3
+            * self.calculate_stellar_damage_multiplier("odette", on_field=False)
         )
-
         # Add Vodyanitsa Stellar Quills flat damage
         damage += self.active_vodyanitsa_stellar_quills_flat_damage
-
         return (
             damage
-            * self.calculate_stellar_crit_multiplier("vesna", "cryo")
-            * self.calculate_anemo_res_multiplier
+            * self.calculate_stellar_crit_multiplier("odette", "cryo")
+            * self.calculate_cryo_res_multiplier
         )
-  
+        
     def calculate_vesna_total_vortex_damage(self) -> float:
-        return (self.calculate_vortex_proc_damage() * self.vortex_procs+ self.calculate_vortex_explosion_damage()* self.vortex_explosions)    
+        proc_damage = self.calculate_vortex_proc_damage()
+        explosion_damage = self.calculate_vortex_explosion_damage()
+
+        return (
+            proc_damage * self.vortex_procs
+            + explosion_damage * self.vortex_explosions
+        )   
 
     def calculate_total_vesna_damage(self, verbose: bool = False) -> float:
-        anemo_damage = self.calculate_anemo_damage_lv95()
+        anemo_damage = self.calculate_anemo_damage_lv90()
         stellar_damage = self.vesna_total_stellar_damage
         vortex_damage = self.calculate_vesna_total_vortex_damage()
 
@@ -1429,73 +1454,67 @@ class VesnaTeamDPSTheorie:
         return self.active_team["members"]
 
     # 8. Team Comps and definitions
-    # TEAMS: ClassVar[list[dict]] = [
-    #     {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
-    #      "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
-
-    #     {"name": "Vesna_Odette_Vodyanitsa_Diona",
-    #      "members": ["vesna", "odette", "vodyanitsa", "diona"]},
-
-    #     {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
-    #      "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
-
-    #     {"name": "Vesna_Odette_Faruzan_Diona",
-    #      "members": ["vesna", "odette", "faruzan", "diona"]},
-
-    #     {"name": "Vesna_Odette_Faruzan_Sucrose",
-    #      "members": ["vesna", "odette", "faruzan", "sucrose"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
-    #      "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
-    #      "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
-
-    #     {"name": "Vesna_Odette_Diona_Sucrose",
-    #      "members": ["vesna", "odette", "diona", "sucrose"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
-    #      "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
-
-    #     {"name": "Vesna_Faruzan_Diona_Sucrose",
-    #      "members": ["vesna", "faruzan", "diona", "sucrose"]},
-
-    #     {"name": "Vesna_Odette_Vodyanitsa_Lumine",
-    #      "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
-
-    #     {"name": "Vesna_Odette_Faruzan_Lumine",
-    #      "members": ["vesna", "odette", "faruzan", "lumine"]},
-
-    #     {"name": "Vesna_Odette_Diona_Lumine",
-    #      "members": ["vesna", "odette", "diona", "lumine"]},
-
-    #     {"name": "Vesna_Odette_Sucrose_Lumine",
-    #      "members": ["vesna", "odette", "sucrose", "lumine"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
-    #      "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Diona_Lumine",
-    #      "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
-
-    #     {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
-    #      "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
-
-    #     {"name": "Vesna_Faruzan_Diona_Lumine",
-    #      "members": ["vesna", "faruzan", "diona", "lumine"]},
-
-    #     {"name": "Vesna_Faruzan_Sucrose_Lumine",
-    #      "members": ["vesna", "faruzan", "sucrose", "lumine"]},
-
-    #     {"name": "Vesna_Diona_Sucrose_Lumine",
-    #      "members": ["vesna", "diona", "sucrose", "lumine"]},
-    # ]
     TEAMS: ClassVar[list[dict]] = [
+        {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
+         "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
+
+        {"name": "Vesna_Odette_Vodyanitsa_Diona",
+         "members": ["vesna", "odette", "vodyanitsa", "diona"]},
+
+        {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
+         "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
 
         {"name": "Vesna_Odette_Faruzan_Diona",
          "members": ["vesna", "odette", "faruzan", "diona"]},
-       ]
 
+        {"name": "Vesna_Odette_Faruzan_Sucrose",
+         "members": ["vesna", "odette", "faruzan", "sucrose"]},
+
+        {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
+         "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
+
+        {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
+         "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
+
+        {"name": "Vesna_Odette_Diona_Sucrose",
+         "members": ["vesna", "odette", "diona", "sucrose"]},
+
+        {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
+         "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
+
+        {"name": "Vesna_Faruzan_Diona_Sucrose",
+         "members": ["vesna", "faruzan", "diona", "sucrose"]},
+
+        {"name": "Vesna_Odette_Vodyanitsa_Lumine",
+         "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
+
+        {"name": "Vesna_Odette_Faruzan_Lumine",
+         "members": ["vesna", "odette", "faruzan", "lumine"]},
+
+        {"name": "Vesna_Odette_Diona_Lumine",
+         "members": ["vesna", "odette", "diona", "lumine"]},
+
+        {"name": "Vesna_Odette_Sucrose_Lumine",
+         "members": ["vesna", "odette", "sucrose", "lumine"]},
+
+        {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
+         "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
+
+        {"name": "Vesna_Vodyanitsa_Diona_Lumine",
+         "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
+
+        {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
+         "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
+
+        {"name": "Vesna_Faruzan_Diona_Lumine",
+         "members": ["vesna", "faruzan", "diona", "lumine"]},
+
+        {"name": "Vesna_Faruzan_Sucrose_Lumine",
+         "members": ["vesna", "faruzan", "sucrose", "lumine"]},
+
+        {"name": "Vesna_Diona_Sucrose_Lumine",
+         "members": ["vesna", "diona", "sucrose", "lumine"]},
+    ]
     VESNA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
     ODETTE_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
     VODYANITSA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
@@ -1986,9 +2005,6 @@ def find_best_dps_profile(profiles, line_type, team_config):
         for stat in ("ATK", "ATK%", "CD%", "EM", "CR%", "ER%")
     }
 
-    total_profiles = len(profiles)
-    print(f"Profiles to evaluate: {total_profiles:,}")
-
     for index, profile in enumerate(profiles, start=1):
         (
             atk_rolls,
@@ -1998,35 +2014,19 @@ def find_best_dps_profile(profiles, line_type, team_config):
             cr_rolls,
             er_rolls,
         ) = profile
-
-        base_crit_rate = (
-            24.2
-            + cr_rolls * ARTIFACT_SUBSTATS["CR%"]["average"]
-        )
-
-        if (
-            "diona" in team_config["members"]
-            and "odette" in team_config["members"]
-        ):
+        base_crit_rate = (24.2+ cr_rolls * ARTIFACT_SUBSTATS["CR%"]["average"])
+        if ("diona" in team_config["members"] and "odette" in team_config["members"]):
             crit_rate = min(100.0, base_crit_rate + 30.8)
         else:
             crit_rate = min(85.0, base_crit_rate + 15.8)
 
         vesna = VesnaTeamDPSTheorie(
             flat_attack_value=atk_rolls * roll_averages["ATK"],
-            atk_percent=(
-                atk_percent_rolls
-                * ARTIFACT_SUBSTATS["ATK%"]["average"]
-            ),
-            crit_damage=(
-                cd_rolls
-                * ARTIFACT_SUBSTATS["CD%"]["average"]
-            ),
+            atk_percent=(atk_percent_rolls* ARTIFACT_SUBSTATS["ATK%"]["average"]),
+            crit_damage=(cd_rolls* ARTIFACT_SUBSTATS["CD%"]["average"]),
             elemental_mastery=em_rolls * roll_averages["EM"],
             crit_rate=crit_rate / 100.0,
-            energy_recharge=(
-                er_rolls * ARTIFACT_SUBSTATS["ER%"]["average"]
-            ),
+            energy_recharge=(er_rolls * ARTIFACT_SUBSTATS["ER%"]["average"]),
             team_name=team_config["team_name"],
             current_configuration=team_config.copy(),
         )
@@ -2037,26 +2037,8 @@ def find_best_dps_profile(profiles, line_type, team_config):
         if dps > best_dps:
             best_dps = dps
             best_profile = profile
-    print()
 
     constellations = team_config["constellations"]
-
-    print("\n" + "=" * 60)
-    print("BEST ARTIFACT PROFILE")
-    print("=" * 60)
-    print(f"Team: {team_config['team_name']}")
-    print(
-        f"Configuration: {team_config['name']} | "
-        f"Vesna C{int(constellations.get('vesna', 0))} | "
-        f"Odette C{int(constellations.get('odette', 0))} | "
-        f"Vodyanitsa C{int(constellations.get('vodyanitsa', 0))}"
-    )
-    print(f"Line Type: {line_type}")
-    print(f"Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): {best_profile}")
-    print(f"Maximum Rotation Damage: {best_dps * rotation_time:,.2f}")
-    print(f"Maximum Vesna DPS: {best_dps:,.2f}")
-
-
 
     if best_profile is not None:
         (
@@ -2083,46 +2065,27 @@ def find_best_dps_profile(profiles, line_type, team_config):
 
         best_vesna = VesnaTeamDPSTheorie(
             flat_attack_value=atk_rolls * roll_averages["ATK"],
-            atk_percent=(
-                atk_percent_rolls
-                * ARTIFACT_SUBSTATS["ATK%"]["average"]
-            ),
-            crit_damage=(
-                cd_rolls
-                * ARTIFACT_SUBSTATS["CD%"]["average"]
-            ),
+            atk_percent=(atk_percent_rolls* ARTIFACT_SUBSTATS["ATK%"]["average"]),
+            crit_damage=(cd_rolls* ARTIFACT_SUBSTATS["CD%"]["average"]),
             elemental_mastery=em_rolls * roll_averages["EM"],
             crit_rate=crit_rate / 100.0,
-            energy_recharge=(
-                er_rolls * ARTIFACT_SUBSTATS["ER%"]["average"]
-            ),
+            energy_recharge=(er_rolls * ARTIFACT_SUBSTATS["ER%"]["average"]),
             team_name=team_config["team_name"],
             current_configuration=team_config.copy(),
         )
-        print("=== VESNA RES DEBUG ===")
-        print("Odette Constellation:", best_vesna.odette_constellation)
-        print("Anemo RES Multiplier:", best_vesna.calculate_anemo_res_multiplier)
-        # Team damage calculation
         members = set(team_config["members"])
-        vesna_rotation_damage = (
-            best_vesna.calculate_total_vesna_damage()
-        )
+        # Vesna damage
+        vesna_rotation_damage = (best_vesna.calculate_total_vesna_damage())
         vesna_dps = vesna_rotation_damage / rotation_time
 
         # Odette - Stellar damage
-        odette_on_field_stellar = (
-            best_vesna.odette_on_field_Coda_stellar_swirl_damage
-            + best_vesna.odette_on_field_C1_additional_stellar_damage
-        )
+        odette_on_field_stellar = (best_vesna.odette_on_field_Coda_stellar_swirl_damage+ best_vesna.odette_on_field_C1_additional_stellar_damage)
 
         # Odette - On-Field Cryo damage
         odette_on_field_cryo = best_vesna.odette_on_field_cryo_damage
 
         # Odette Total on-field damage
-        odette_on_field_total = (
-            odette_on_field_stellar
-            + odette_on_field_cryo
-        )
+        odette_on_field_total = (odette_on_field_stellar+ odette_on_field_cryo)
 
         odette_off_field_stellar = (
             best_vesna.odette_off_field_Coda_stellar_swirl_damage
@@ -2131,16 +2094,6 @@ def find_best_dps_profile(profiles, line_type, team_config):
             + best_vesna.odette_wing_stellar_hits
             * best_vesna.odette_off_field_wing_stellar_swirl_damage
         )
-        #Odette Debug
-        print("Coda:", best_vesna.odette_off_field_Coda_stellar_swirl_damage)
-        print("Plume total:", best_vesna.odette_plume_stellar_hits * best_vesna.odette_off_field_plume_stellar_swirl_damage)
-        print("Wing total:", best_vesna.odette_wing_stellar_hits * best_vesna.odette_off_field_wing_stellar_swirl_damage)
-        print("Off-Field total:", odette_off_field_stellar)
-        print("Off-Field ATK:", best_vesna.odette_off_field_atk)
-        print("Odette EM:", best_vesna.odette_em)
-        print("Off-Field Stellar Multiplier:", best_vesna.calculate_stellar_damage_multiplier("odette", on_field=False))
-        print("Odette Crit Multiplier:", best_vesna.odette_crit_multiplier)
-        print("Cryo RES Multiplier:", best_vesna.calculate_cryo_res_multiplier)
 
         # Lumine Damage Breakdown
         lumine_stellar_charge_attack = (best_vesna.lumine_stellar_charge_attack_damage if "lumine" in members else 0.0)
@@ -2149,40 +2102,10 @@ def find_best_dps_profile(profiles, line_type, team_config):
         lumine_ultimate_q = (best_vesna.lumine_ultimate_q_stellar_damage if "lumine" in members else 0.0)
 
         # Lumine - Cryo and Stellar damage
-        lumine_rotation_damage = (
-            lumine_stellar_charge_attack
-            + lumine_e_skill_on_field
-            + lumine_e_skill_off_field
-            + lumine_ultimate_q
-        )
-
-        print("\n" + "-" * 60)
-        print("ODETTE DAMAGE BREAKDOWN")
-        print("-" * 60)
-
-        if "odette" in members:
-            print(f"On-Field Stellar Damage: {odette_on_field_stellar:,.2f}")
-            print(f"On-Field Cryo Damage:    {odette_on_field_cryo:,.2f}")
-            print(f"On-Field Total Damage:   {odette_on_field_total:,.2f}")
-        else:
-            print(f"On-Field Stellar Damage:  {0.0:,.2f}")
-            print(f"Off-Field Stellar Damage: {0.0:,.2f}")
-
-        print("-" * 60)
+        lumine_rotation_damage = (lumine_stellar_charge_attack+ lumine_e_skill_on_field+ lumine_e_skill_off_field+ lumine_ultimate_q)
 
         # DEBUG: Artifact set assignments
         artifact_buffs = best_vesna.active_team_artifact_set_distribution_and_buffs
-
-        print()
-        print("-" * 60)
-        print("DEBUG ARTIFACT SET ASSIGNMENTS")
-        print("-" * 60)
-
-        for set_name, details in artifact_buffs.items():
-            holder = details.get("holder")
-            print(f"{set_name}: {holder if holder is not None else 'no holder'}")
-
-        print("-" * 60)
 
         odette_rotation_damage = (odette_on_field_total+ odette_off_field_stellar + best_vesna.vortex_procs * best_vesna.calculate_odette_vortex_proc_damage(level=90) + best_vesna.vortex_explosions * best_vesna.calculate_odette_vortex_explosion_damage(level=90))
         odette_dps = odette_rotation_damage / rotation_time
@@ -2212,31 +2135,54 @@ def find_best_dps_profile(profiles, line_type, team_config):
         team_rotation_damage = team_dps * rotation_time
     
         # Final report
-        print("TEAM DAMAGE BREAKDOWN")
+        print("TEAM OVERVIEW")
+        print(f"Team: {team_config['team_name']}")
+        print()
         print("-" * 60)
-        print(f"Rotation Duration:          {rotation_time:.2f} s")
+        print("CHARACTER CONSTELLATIONS")
+        print("-" * 60)
+        print(f"Vesna: C{int(constellations.get('vesna', 0))}")
+        print(f"Odette: C{int(constellations.get('odette', 0))}")
+        print(f"Vodyanitsa: C{int(constellations.get('vodyanitsa', 0))}")
+
+        print()
+        print("-" * 60)
+        print("ARTIFACT SET ASSIGNMENTS")
+        print("-" * 60)
+
+        for set_name, details in artifact_buffs.items():
+            holder = details.get("holder")
+            print(f"{set_name}: {holder if holder is not None else 'no holder'}")
+
+        print()
+        print("-" * 60)
+        print("BEST ARTIFACT PROFILE")
+        print("-" * 60)
+        print(f"(ATK, ATK%, CD%, EM, CR%, ER%): {best_profile}")
+
+        print()
+        print("-" * 60)
+        print("CHARACTER DAMAGE BREAKDOWN")
+        print("-" * 60)
         print(f"Vesna Rotation Damage:      {vesna_rotation_damage:,.2f}")
         print(f"Vesna DPS:                  {vesna_dps:,.2f}")
+        print()
         print(f"Odette Total Damage:        {odette_rotation_damage:,.2f}")
         print(f"Odette DPS:                 {odette_dps:,.2f}")
         print()
+        print(f"Lumine DPS:                 {lumine_dps:,.2f}")
+        print(f"Diona DPS:                  {diona_dps_value:,.2f}")
+        print(f"Faruzan DPS:                {faruzan_dps_value:,.2f}")
+        print(f"Sucrose DPS:                {sucrose_dps_value:,.2f}")
+        print(f"Vodyanitsa DPS:             {vodyanitsa_flat_dps:,.2f}")
+
+        print()
         print("-" * 60)
-        print("LUMINE DAMAGE BREAKDOWN")
+        print("TEAM DAMAGE")
         print("-" * 60)
-        print(f"Stellar Charge Attack Damage:   {lumine_stellar_charge_attack:,.2f}")
-        print(f"E-Skill Cryo Damage On-Field:   {lumine_e_skill_on_field:,.2f}")
-        print(f"E-Skill Cryo Damage Off-Field:  {lumine_e_skill_off_field:,.2f}")
-        print(f"Ultimate Q Stellar Damage:      {lumine_ultimate_q:,.2f}")
-        print("-" * 60)
-        print(f"Lumine Rotation Damage:         {lumine_rotation_damage if 'lumine' in members else 0.0:,.2f}")
-        print(f"Lumine DPS:                     {lumine_dps:,.2f}")
-        print(f"Diona DPS:                      {diona_dps_value:,.2f}")
-        print(f"Faruzan DPS:                    {faruzan_dps_value:,.2f}")
-        print(f"Sucrose DPS:                    {sucrose_dps_value:,.2f}")
-        print(f"Vodyanitsa DPS:                 {vodyanitsa_flat_dps:,.2f}")
-        print("-" * 60)
-        print(f"Total Team Rotation Damage:     {team_rotation_damage:,.2f}")
-        print(f"TOTAL TEAM DPS:                 {team_dps:,.2f}")
+        print(f"Rotation Duration:          {rotation_time:.2f} s")
+        print(f"Total Team Rotation Damage: {team_rotation_damage:,.2f}")
+        print(f"TOTAL TEAM DPS:             {team_dps:,.2f}")
         print("=" * 60)
 
     return best_profile, best_dps
@@ -2252,15 +2198,8 @@ if __name__ == "__main__":
     atexit.register(log_file.close)
     calculator = VesnaTeamDPSTheorie()
     line_type = "3_line"
-
-    print("\n=== Loading Combined Artifact Profiles ===")
     combined_profiles = load_or_calculate_profiles(line_type)
-
-    print(f"\nTotal Artifact Profiles: {len(combined_profiles):,}")
-    print("\n=== Starting Team Optimization ===")
-
     total_configurations = len(calculator.all_team_configurations)
-
     for index, config in enumerate(
         calculator.all_team_configurations,
         start=1,
