@@ -1,10 +1,15 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field,asdict
 from itertools import product, combinations
 import json
 from pathlib import Path
 from typing import ClassVar
 import sys
 import atexit
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.formatting.rule import ColorScaleRule
+from openpyxl.utils import get_column_letter
+
 class Tee:
     """Writes console output to both the console and a log file."""
 
@@ -175,7 +180,7 @@ VESNA_ROTATION = [
 ]
 
 @dataclass
-class VesnaTeamDPSTheorie:
+class VesnaTeamDPSTheory:
    # Vesna is always using her Signature and Scarlet Proof Set
    # 1. GENERAL COMBAT AND ENEMY STATS
     general_defense_multiplier_90: float = 190 / 390
@@ -1561,6 +1566,228 @@ class VesnaTeamDPSTheorie:
 
         return configurations
 
+
+@dataclass
+class VesnaDPSTheoryExport:
+    configuration: int
+    team_name: str
+    configuration_name: str
+    line_type: str
+
+    vesna_constellation: int
+    odette_constellation: int
+    vodyanitsa_constellation: int
+
+    artifact_sets: dict[str, str | None]
+
+    best_profile: tuple[int, int, int, int, int, int]
+
+    vesna_rotation_damage: float
+    vesna_dps: float
+
+    odette_rotation_damage: float
+    odette_dps: float
+
+    lumine_dps: float
+    diona_dps: float
+    faruzan_dps: float
+    sucrose_dps: float
+    vodyanitsa_dps: float
+
+    rotation_duration: float
+    team_rotation_damage: float
+    team_dps: float
+
+    @classmethod
+    def export_to_excel(
+        cls,
+        results: list["VesnaDPSTheoryExport"],
+        output_path: str = "vesna_team_dps.xlsx",
+    ) -> None:
+
+        if not results:
+            raise ValueError("No export results available.")
+
+        wb = Workbook()
+
+        # ----------------------------------------------------
+        # Configurations
+        # ----------------------------------------------------
+
+        ws = wb.active
+        ws.title = "Configurations"
+
+        headers = list(asdict(results[0]).keys())
+        ws.append(headers)
+
+        for result in results:
+            row = asdict(result)
+
+            # Store artifact assignments as separate columns.
+            artifact_sets = row.pop("artifact_sets")
+            best_profile = row.pop("best_profile")
+
+            row.update({
+                f"artifact_{key}": value
+                for key, value in artifact_sets.items()
+            })
+
+            profile_names = [
+                "profile_atk",
+                "profile_atk_percent",
+                "profile_cd_percent",
+                "profile_em",
+                "profile_cr_percent",
+                "profile_er_percent",
+            ]
+
+            row.update(dict(zip(profile_names, best_profile)))
+
+            ws.append([
+                row.get(header)
+                for header in headers
+            ])
+
+        # ----------------------------------------------------
+        # Ranking
+        # ----------------------------------------------------
+
+        ranking = wb.create_sheet("Ranking")
+
+        ranking_headers = [
+            "Rank",
+            "Configuration",
+            "Team",
+            "Line Type",
+            "Team Rotation Damage",
+            "Rotation Duration",
+            "Team DPS",
+        ]
+
+        ranking.append(ranking_headers)
+
+        sorted_results = sorted(
+            results,
+            key=lambda item: item.team_dps,
+            reverse=True,
+        )
+
+        for rank, result in enumerate(sorted_results, start=1):
+            ranking.append([
+                rank,
+                result.configuration,
+                result.team_name,
+                result.line_type,
+                result.team_rotation_damage,
+                result.rotation_duration,
+                result.team_dps,
+            ])
+
+        # ----------------------------------------------------
+        # Analysis
+        # ----------------------------------------------------
+
+        analysis = wb.create_sheet("Analysis")
+
+        analysis.append(["Metric", "Value"])
+        analysis.append(["Total Configurations", len(results)])
+
+        dps_values = [result.team_dps for result in results]
+
+        analysis.append([
+            "Average Team DPS",
+            sum(dps_values) / len(dps_values),
+        ])
+
+        analysis.append(["Highest Team DPS", max(dps_values)])
+        analysis.append(["Lowest Team DPS", min(dps_values)])
+
+        best_result = max(
+            results,
+            key=lambda item: item.team_dps,
+        )
+
+        analysis.append([
+            "Best Configuration",
+            best_result.configuration,
+        ])
+
+        analysis.append([
+            "Best Team",
+            best_result.team_name,
+        ])
+
+        # ----------------------------------------------------
+        # Formatting
+        # ----------------------------------------------------
+
+        for sheet in wb.worksheets:
+            sheet.freeze_panes = "B2"
+            sheet.auto_filter.ref = sheet.dimensions
+
+            for cell in sheet[1]:
+                cell.font = Font(
+                    bold=True,
+                    color="FFFFFF",
+                )
+                cell.fill = PatternFill(
+                    "solid",
+                    fgColor="1F4E78",
+                )
+                cell.alignment = Alignment(
+                    horizontal="center",
+                )
+
+            for column in sheet.columns:
+                column_letter = get_column_letter(
+                    column[0].column
+                )
+
+                max_length = max(
+                    (
+                        len(str(cell.value))
+                        for cell in column
+                        if cell.value is not None
+                    ),
+                    default=10,
+                )
+
+                sheet.column_dimensions[column_letter].width = min(
+                    max_length + 2,
+                    32,
+                )
+
+        # Highlight team DPS values.
+        for sheet_name, column_name in [
+            ("Configurations", "team_dps"),
+            ("Ranking", "Team DPS"),
+        ]:
+            sheet = wb[sheet_name]
+
+            headers = [
+                cell.value
+                for cell in sheet[1]
+            ]
+
+            if column_name in headers:
+                column_index = headers.index(column_name) + 1
+                column_letter = get_column_letter(column_index)
+
+                sheet.conditional_formatting.add(
+                    f"{column_letter}2:{column_letter}{sheet.max_row}",
+                    ColorScaleRule(
+                        start_type="min",
+                        start_color="F8696B",
+                        mid_type="percentile",
+                        mid_value=50,
+                        mid_color="FFEB84",
+                        end_type="max",
+                        end_color="63BE7B",
+                    ),
+                )
+
+        wb.save(Path(output_path))
+
 # COMBINATORICS: GENERATE DISTRIBUTIONS
 def calculate_distributions(line_type):
     """
@@ -1989,7 +2216,7 @@ def load_or_calculate_profiles(line_type):
     return profiles
 
 
-def find_best_dps_profile(profiles, line_type, team_config):
+def find_best_dps_profile(profiles, line_type, team_config, configuration):
     """
     Finds the best artifact profile for a given team configuration.
 
@@ -2020,7 +2247,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
         else:
             crit_rate = min(85.0, base_crit_rate + 15.8)
 
-        vesna = VesnaTeamDPSTheorie(
+        vesna = VesnaTeamDPSTheory(
             flat_attack_value=atk_rolls * roll_averages["ATK"],
             atk_percent=(atk_percent_rolls* ARTIFACT_SUBSTATS["ATK%"]["average"]),
             crit_damage=(cd_rolls* ARTIFACT_SUBSTATS["CD%"]["average"]),
@@ -2063,7 +2290,7 @@ def find_best_dps_profile(profiles, line_type, team_config):
         else:
             crit_rate = min(85.0, base_crit_rate + 15.8)
 
-        best_vesna = VesnaTeamDPSTheorie(
+        best_vesna = VesnaTeamDPSTheory(
             flat_attack_value=atk_rolls * roll_averages["ATK"],
             atk_percent=(atk_percent_rolls* ARTIFACT_SUBSTATS["ATK%"]["average"]),
             crit_damage=(cd_rolls* ARTIFACT_SUBSTATS["CD%"]["average"]),
@@ -2184,10 +2411,41 @@ def find_best_dps_profile(profiles, line_type, team_config):
         print(f"Total Team Rotation Damage: {team_rotation_damage:,.2f}")
         print(f"TOTAL TEAM DPS:             {team_dps:,.2f}")
         print("=" * 60)
+        # Export data
+        export_data = VesnaDPSTheoryExport(
+            configuration=configuration,
+            team_name=team_config["team_name"],
+            configuration_name=team_config.get("configuration_name", ""),
+            line_type=line_type,
 
-    return best_profile, best_dps
+            vesna_constellation=int(constellations.get("vesna", 0)),
+            odette_constellation=int(constellations.get("odette", 0)),
+            vodyanitsa_constellation=int(constellations.get("vodyanitsa", 0)),
 
+            artifact_sets={
+                set_name: details.get("holder")
+                for set_name, details in artifact_buffs.items()
+            },
 
+            best_profile=best_profile,
+
+            vesna_rotation_damage=vesna_rotation_damage,
+            vesna_dps=vesna_dps,
+
+            odette_rotation_damage=odette_rotation_damage,
+            odette_dps=odette_dps,
+
+            lumine_dps=lumine_dps,
+            diona_dps=diona_dps_value,
+            faruzan_dps=faruzan_dps_value,
+            sucrose_dps=sucrose_dps_value,
+            vodyanitsa_dps=vodyanitsa_flat_dps,
+
+            rotation_duration=rotation_time,
+            team_rotation_damage=team_rotation_damage,
+            team_dps=team_dps,
+        )
+    return best_profile, best_dps, export_data if best_profile is not None else None
 
 # 13. PROGRAM ENTRY POINT – OUTSIDE THE CLASS
 if __name__ == "__main__":
@@ -2196,10 +2454,15 @@ if __name__ == "__main__":
 
     sys.stdout = Tee(sys.stdout, log_file)
     atexit.register(log_file.close)
-    calculator = VesnaTeamDPSTheorie()
+
+    calculator = VesnaTeamDPSTheory()
     line_type = "3_line"
     combined_profiles = load_or_calculate_profiles(line_type)
+
     total_configurations = len(calculator.all_team_configurations)
+
+    export_results: list[VesnaDPSTheoryExport] = []
+
     for index, config in enumerate(
         calculator.all_team_configurations,
         start=1,
@@ -2209,8 +2472,18 @@ if __name__ == "__main__":
             f"Configuration {index}/{total_configurations}"
         )
 
-        best_profile, best_dps = find_best_dps_profile(
+        best_profile, best_dps, export_data = find_best_dps_profile(
             combined_profiles,
             line_type,
             config,
+            configuration=index,
         )
+        if export_data is not None: export_results.append(export_data)
+
+    VesnaDPSTheoryExport.export_to_excel(
+        export_results,
+        output_path=Path(__file__).with_name("vesna_team_dps.xlsx"),
+    )
+
+    print("\nExcel export completed.")
+
