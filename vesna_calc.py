@@ -197,68 +197,9 @@ class VesnaTeamDPSTheorie:
     vortex_explosions: float = 5.5
     vortex_procs_vodyanitsa: float = 12
     vortex_explosions_vodyanitsa: float = 3
-
-
-    def calculate_anemo_res_multiplier(self) -> float:
-        effective_resistance = (
-            self.enemy_anemo_resistance
-            - self.vesna_anemo_res_reduction
-        ) / 100.0
-
-        if effective_resistance < 0.0:
-            return 1.0 - effective_resistance / 2.0
-
-        if effective_resistance < 0.75:
-            return 1.0 - effective_resistance
-
-        return 1.0 / (4.0 * effective_resistance + 1.0)
-
-    def calculate_cryo_res_multiplier(self) -> float:
-        effective_resistance = (
-            self.enemy_cryo_resistance
-            - self.odette_cryo_res_reduction
-        ) / 100.0
-
-        if effective_resistance < 0.0:
-            return 1.0 - effective_resistance / 2.0
-
-        if effective_resistance < 0.75:
-            return 1.0 - effective_resistance
-
-        return 1.0 / (4.0 * effective_resistance + 1.0)
-
+    #Fuction to determine which character is holding which artifact set and its buffs
     @property
-    def team_wide_stellar_damage_bonus(self) -> float:
-        """Returns the combined team-wide Stellar damage bonus in percent."""
-
-        buff = 0.0
-
-        # Odette: Marvelous Splendor stacks and Furnace set bonus
-        if self.is_odette_active:
-            stacks = (
-                self.odette_C1_marvelous_splender_stacks
-                if self.odette_constellation >= 1
-                else self.odette_marvelous_splender_stacks
-            )
-            buff += self.odette_C0_stellar_damage * stacks
-            buff += self.odette_furnace_set_stellar_damage_bonus
-
-        # Faruzan's Breezeborne R5 bonus, if Diona or Faruzan is active
-        if self.is_diona_active or self.is_faruzan_active:
-            buff += self.faruzan_breezeborne_r5_stellar_damage_bonus
-
-        # Diona: C6 Stellar damage bonus
-        if self.is_diona_active:
-            buff += self.diona_C6_stellar_damage_bonus
-
-        # Lumine C6: up to +40% Stellar Glimmer reaction damage for 15s
-        if self.is_lumine_active:
-            buff += 40.0
-
-        return buff
-
-    @property
-    def active_team_artifact_buffs(self) -> dict:
+    def active_team_artifact_set_distribution_and_buffs(self) -> dict:
         """Dynamically assigns artifact sets and returns their effects and conditions."""
 
         buffs = {}
@@ -277,20 +218,38 @@ class VesnaTeamDPSTheorie:
         else:
             furnace_holder = "sucrose"
 
-        # ToM priority: Vodyanitsa > Diona
+        # ToM holder: Vodyanitsa > Diona > Lumine
         if self.is_vodyanitsa_active:
             tom_holder = "vodyanitsa"
         elif self.is_diona_active:
             tom_holder = "diona"
+        elif self.is_lumine_active:
+            tom_holder = "lumine"
         else:
             tom_holder = None
 
-        # Noblesse holder: Diona only when Vodyanitsa is in the team.
-        # Vesna recieves Nobless buff by switching onto the field immediately after the Noblesse holder.
-        if self.is_diona_active and self.is_vodyanitsa_active:
+        # Noblesse holder
+        if self.is_vodyanitsa_active and self.is_diona_active:
             noblesse_holder = "diona"
+        elif self.is_diona_active and self.is_lumine_active:
+            noblesse_holder = "diona"
+        elif (
+            self.is_vodyanitsa_active
+            and self.is_lumine_active
+            and tom_holder != "lumine"
+        ):
+            noblesse_holder = "lumine"
         else:
             noblesse_holder = None
+
+        # Lumine 2pc/2pc ATK: Vodyanitsa + Lumine, without Diona
+        atk_2p2p_holder = (
+            "lumine"
+            if self.is_vodyanitsa_active
+            and self.is_lumine_active
+            and not self.is_diona_active
+            else None
+        )
 
         # --------------------------------------------------
         # 2. Furnace set
@@ -358,8 +317,8 @@ class VesnaTeamDPSTheorie:
         # 6. Lumine's 2-piece + 2-piece ATK sets
         # --------------------------------------------------
 
-        buffs["lumine_2p2p_atk"] = {
-            "holder": "lumine" if self.is_lumine_active and furnace_holder != "lumine" else None,
+        buffs["atk_2p2p"] = {
+            "holder": atk_2p2p_holder,
             "atk_bonus": 36.0,
         }
 
@@ -379,24 +338,321 @@ class VesnaTeamDPSTheorie:
 
         return buffs
 
+    #Team wide ATK% form talents, weapons, cons or artifact sets
     @property
-    def active_team_stellar_buffs(self) -> dict:
-        """Returns Stellar buffs currently active in the team rotation."""
-        buffs = {}
+    def team_atk_percent_artifact_and_other_bonus(self) -> float:
+        """Returns the combined team-wide ATK% bonuses."""
 
-        # Add each buff only when its rotation conditions are met.
-        # Store its value, duration and eligible recipients.
+        buff = 0.0
+        # Vesna: A3 talent
+        if self.is_vodyanitsa_active:
+            buff += self.atk_percent_vesna_a3_talent_cryo_anemo_trio
+        else:
+            buff += self.atk_percent_vesna_a3_talent_cryo_anemo_quartett
+        # Odette: Marvelous Splendor C2
+        if (self.is_odette_active and self.odette_constellation >= 2):
+            buff += self.odette_C2_marvelous_splender_stacks_atk_percent * 6
 
-        return buffs
+        # Tenacity of the Millelith
+        if self.active_team_artifact_set_distribution_and_buffs["tom"]["holder"] is not None:
+            buff += 20.0
+
+        # Noblesse Oblige
+        if self.active_team_artifact_set_distribution_and_buffs["noblesse"]["holder"] is not None:
+            buff += 20.0
+
+        # Vodyanitsa: Signature Weapon
+        if self.is_vodyanitsa_active:
+            buff += self.vodyanitsa_signature_atk_bonus
+
+        return buff /100.0
+    #General Teamwide EM buffs applied to specific Characters
+    def team_em_buff(self, character: str) -> float:
+        buff = 0.0
+
+        # Diona C6 EM buff only applies to Vesna
+        if self.is_diona_active and character == "vesna":
+            buff += self.diona_C6_EM_value
+
+        # Vesna receives an additional A3 EM bonus when Vodya is in the team
+        if self.is_vodyanitsa_active and character == "vesna":
+            buff += self.em_bonus_vesna_a3_talent_other_solo
+
+        if self.is_sucrose_active:
+
+            # Apply full Sucrose buffs when Lumine is in the team
+            if self.is_lumine_active and character in ("lumine", "odette", "vesna"):
+                buff += self.sucrose_instrcutor_team_buff_em_value
+                buff += self.sucrose_talent_catalyst_conversion_bonus_em_value
+                buff += self.sucrose_talent_mollis_favonius_em_value
+
+            # Apply Odette buffs when Lumine is not in the team
+            elif character == "odette":
+                buff += self.sucrose_instrcutor_team_buff_em_value
+                buff += self.sucrose_talent_catalyst_conversion_bonus_em_value
+                buff += self.sucrose_talent_mollis_favonius_em_value
+
+            # Apply reduced Sucrose buffs to Vesna without Lumine
+            elif character == "vesna":
+                vesna_sucrose_buff = (
+                    self.sucrose_instrcutor_team_buff_em_value
+                    + self.sucrose_talent_mollis_favonius_em_value
+                )
+
+                buff += vesna_sucrose_buff * 0.75
+
+        return buff
+
+    #Team wide Stellar Bonuses from talents, weapons, cons or artifact sets
+    @property
+    def team_stellar_damage_bonus(self) -> float:
+        """Team-wide Stellar damage bonuses."""
+
+        buff = 0.0
+
+        # Furnace set bonus
+        if self.active_team_artifact_set_distribution_and_buffs["furnace"]["holder"] is not None:
+            buff += self.odette_furnace_set_stellar_damage_bonus
+
+        # Faruzan: Breezeborne R5
+        if self.is_faruzan_active:
+            buff += self.faruzan_breezeborne_r5_stellar_damage_bonus
+
+        # Lumine: Stellar Jubilee
+        if self.is_lumine_active:
+            buff += 40.0
+
+        return buff / 100.0
+    #General Stellar Anemo Crit damage
+    def calculate_stellar_crit_multiplier(self, character: str, element: str) -> float:
+
+        # 1. Charakterbezogenen Krit-Schaden bestimmen
+        if character == "vesna":
+            crit_damage = (
+                  self.crit_damage_base
+                + self.crit_damage_circlet
+                + self.crit_damage_signature
+                + self.crit_damage
+                + self.weapon_proc_crit_damage
+            )
+
+        elif character == "odette":
+            crit_damage = self.odette_cd
+
+        elif character == "lumine":
+            crit_damage = self.lumine_total_CD
+
+        elif character == "anastasya":
+            # Temporarily use Lumine's Crit-DMG profile
+            crit_damage = self.lumine_total_CD 
+
+        else:
+            raise ValueError(f"Unknown character: {character}")
+
+        # 2. Vodyanitsa C2: Stellar Crit-DMG
+        if (self.is_vodyanitsa_active and self.current_configuration["constellations"].get("vodyanitsa", 0) >= 2):
+            crit_damage += self.vodyanitsa_C2_stellar_reaction_cd_bonus
+
+        # 3. Elemental Crit Damage Mods
+        if element == "anemo":
+            if self.is_faruzan_active:
+                crit_damage += self.faruzan_c6_anemo_crit_damage
+
+        elif element != "cryo":
+            raise ValueError(f"Unsupported Stellar element: {element}")
+
+        return 1.0 + crit_damage / 100.0
+    # General EMM Multiplier for Vesna, Odette, Lumine, Anastasya
+    def calculate_stellar_damage_multiplier(
+        self,
+        character: str,
+        on_field: bool = True
+    ) -> float:
+
+        # 1. Determine character-specific Elemental Mastery
+        if character == "vesna":
+            elemental_mastery = self.vesna_em_value
+            personal_stellar_bonus = (
+                self.vesna_weapon_stellar_bonus
+                + self.vesna_artifact_set_stellar_bonus
+            ) / 100.0
+
+        elif character == "odette":
+            elemental_mastery = self.odette_em
+            personal_stellar_bonus = 30.0 / 100.0
+
+        elif character == "lumine":
+            elemental_mastery = self.lumine_base_em_value
+            personal_stellar_bonus = 0.0
+
+        elif character == "anastasya":
+            elemental_mastery = self.lumine_base_em_value
+            personal_stellar_bonus = 0.0
+
+        else:
+            raise ValueError(f"Unknown character: {character}")
+
+        # 2. Odette: Marvelous Splendor C1
+        if self.is_odette_active:
+            stacks = (
+                self.odette_C1_marvelous_splender_stacks
+                if self.odette_constellation >= 1
+                else self.odette_marvelous_splender_stacks
+            )
+
+            # Odette receives the bonus only while on-field
+            if character == "odette" and on_field:
+                personal_stellar_bonus += (
+                    stacks * self.odette_C0_stellar_damage / 100.0
+                )
+
+            # Other characters receive the transferred bonus
+            elif character != "odette":
+                personal_stellar_bonus += (
+                    stacks * self.odette_C0_stellar_damage / 100.0
+                )
+
+        # 3. Calculate talent-based Stellar damage bonuses
+        talent_stellar_bonus = (
+            (self.odette_talent_stellar_damage_bonus if self.is_odette_active else 0.0)
+            + self.vesna_talent_stellar_base_damage_bonus
+            + (
+                self.lumine_stellar_jubilee_talent_stellar_base_damage_mod
+                if self.is_lumine_active else 0.0
+            )
+        ) / 100.0
+        # 4. Calculate final Stellar damage multiplier
+        return (
+            (1.0 + talent_stellar_bonus)
+            * (
+                1.0
+                + (6.0 * elemental_mastery) / (elemental_mastery + 2000.0)
+                + self.team_stellar_damage_bonus
+                + personal_stellar_bonus
+            )
+        )
+
+    #Team wide modified cryo resistance resulting in its multiplicator
+    @property
+    def calculate_anemo_res_multiplier(self) -> float:
+        resistance_reduction = 0.0
+
+        if self.is_faruzan_active:
+            resistance_reduction += self.faruzan_anemo_res_reduction
+
+        if self.is_vodyanitsa_active:
+            resistance_reduction += self.vodyanitsa_anemo_res_reduction
+
+        effective_resistance = (
+            self.enemy_anemo_resistance - resistance_reduction
+        ) / 100.0
+
+        if effective_resistance < 0.0:
+            return 1.0 - effective_resistance / 2.0
+
+        if effective_resistance < 0.75:
+            return 1.0 - effective_resistance
+
+        return 1.0 / (4.0 * effective_resistance + 1.0)
+    #Team wide modified cryo resistance resulting in its multiplicator
+    @property
+    def calculate_cryo_res_multiplier(self) -> float:
+        resistance_reduction = 0.0
+
+        if self.is_vodyanitsa_active:
+            resistance_reduction += self.vodyanitsa_cryo_res_reduction
+
+        if self.is_odette_active and self.odette_constellation >= 2:
+            resistance_reduction += self.odette_C2_cryo_res_reduction
+
+        if self.active_team_artifact_set_distribution_and_buffs["vv"]["holder"] == "faruzan":
+            resistance_reduction += self.faruzan_VV_set_cryo_res_reduction
+
+        effective_resistance = (
+            self.enemy_cryo_resistance - resistance_reduction
+        ) / 100.0
+
+        if effective_resistance < 0.0:
+            return 1.0 - effective_resistance / 2.0
+
+        if effective_resistance < 0.75:
+            return 1.0 - effective_resistance
+
+        return 1.0 / (4.0 * effective_resistance + 1.0)
+
+    @property
+    def vesna_constellation(self) -> int:
+        return int(
+            self.current_configuration.get("constellations", {}).get(
+                "vesna", 0
+            )
+        )
+
+    @property
+    def odette_constellation(self) -> int:
+        return int(
+            self.current_configuration.get("constellations", {}).get(
+                "odette", 0
+            )
+        )
+
+    @property
+    def vodyanitsa_constellation(self) -> int:
+        return int(
+            self.current_configuration.get("constellations", {}).get(
+                "vodyanitsa", 0
+            )
+        )
+    
+    @property
+    def active_team_members(self) -> list[str]:
+        return self.active_team["members"]
+
+    @property
+    def is_diona_active(self) -> bool:
+        return "diona" in self.active_team_members
+
+    @property
+    def is_faruzan_active(self) -> bool:
+        return "faruzan" in self.active_team_members
+
+    @property
+    def is_sucrose_active(self) -> bool:
+        return "sucrose" in self.active_team_members
+
+    @property
+    def is_vodyanitsa_active(self) -> bool:
+        return "vodyanitsa" in self.active_team_members
+
+    @property
+    def is_odette_active(self) -> bool:
+        return "odette" in self.active_team_members
+
+    @property
+    def is_lumine_active(self) -> bool:
+        return "lumine" in self.active_team_members
+
+    @property
+    def is_anastasya_active(self) -> bool:
+        return "anastasya" in self.active_team_members
+
     # 2. VESNA – character stats and MV
     vesna_level_90: int = 90
     vesna_level_95: int = 95
-    level: int = 95
+    level: int = 95 #change lv 90 / 95 / 100 to evaluate which level Vesna is
     base_atk_lv_90: float = 1028
     base_atk_lv_95: float = 1068
     vesna_flat_atk_feather: float = 311
     vesna_base_em: float = 0.0
-    atk_percent_vesna_a3_solo: float = 6
+
+    atk_percent_vesna_a3_talent_cryo_anemo_solo: float = 6
+    atk_percent_vesna_a3_talent_cryo_anemo_duo: float = 12
+    atk_percent_vesna_a3_talent_cryo_anemo_trio: float = 18 #caps here if vodya is in the team
+    atk_percent_vesna_a3_talent_cryo_anemo_quartett: float = 24
+
+    em_bonus_vesna_a3_talent_other_solo: float = 25 #if Vodya is in the team
+    em_bonus_vesna_a3_talent_other_duo: float = 50
+    em_bonus_vesna_a3_talent_other_trio: float = 75 #Vesna + 3 not cryo/anemo
 
     atk_percent_sands: float = 46.6
     atk_percent_goblet: float = 46.6
@@ -419,7 +675,7 @@ class VesnaTeamDPSTheorie:
     anemo_mv: float = 1521.32
     stellar_anemo_mv: float = 3633.00
 
-    vesna_talent_stellar_damage_bonus: float = 14
+    vesna_talent_stellar_base_damage_bonus: float = 14
 
     e_stellar_mv: float = 72
     se1_stellar_mv: float = 72
@@ -454,8 +710,7 @@ class VesnaTeamDPSTheorie:
     odette_cr: float = 88.8
     odette_cd: float = 220.5
 
-    # Team-Buffs
-    atk_percent_vesna_a3_value_odette: float = 6.0
+    odette_furnace_set_stellar_damage_bonus: float = 50.0
 
 
     # E-Skill – cryo damage
@@ -486,7 +741,6 @@ class VesnaTeamDPSTheorie:
     odette_C0_stellar_damage: float = 15.0
     odette_personal_stellar_damage_bonus: float = 30.0
     odette_talent_stellar_damage_bonus: float = 14.0
-    odette_furnace_set_stellar_damage_bonus: float = 50.0
 
 
     # Marvelous Splendor – Stacks
@@ -505,144 +759,183 @@ class VesnaTeamDPSTheorie:
     odette_C2_anemo_res_reduction: float = 20.0
 
     @property
-    def active_odette_talent_stellar_damage_bonus(self) -> float:
-        if self.is_odette_active:
-            return self.odette_talent_stellar_damage_bonus
-        return 0.0
-
-    @property
-    def odette_total_stellar_damage_bonus(self) -> float:
-        stacks = self.odette_marvelous_splender_stacks
-
-        # Odette C1 – Marvelous Splendor uses 6 stacks.
-        if self.current_configuration["constellations"].get("odette", 0) >= 1:
-            stacks = self.odette_C1_marvelous_splender_stacks
-
-        bonus = (
-            self.odette_C0_stellar_damage * stacks
-            + self.odette_personal_stellar_damage_bonus
-            + self.odette_furnace_set_stellar_damage_bonus
-        )
-
-        # Faruzan's / Diona's Breezeborne R5 bonus
-        # Diona Q EM / Stellar Buff is not active here
-        if self.is_diona_active or self.is_faruzan_active:
-            bonus += self.faruzan_breezeborne_r5_stellar_damage_bonus
-
-        return bonus
-
-    @property
-    def odette_off_field_stellar_damage_bonus(self) -> float:
-        return self.odette_furnace_set_stellar_damage_bonus
-    @property
     def odette_atk_percent_value(self) -> float:
-        return self.team_atk_percent_buff
+        return self.team_atk_percent_artifact_and_other_bonus
     @property
     def odette_on_field_atk(self) -> float:
-        return (
-            self.odette_atk
-            + self.odette_base_atk
-            * self.odette_atk_percent_value
-            / 100.0
-            
-        )
+        return self.odette_atk + self.odette_base_atk * self.odette_atk_percent_value
+    @property
+    def odette_off_field_atk_percent_value(self) -> float:
+        buff = 0.0
+
+        # Tenacity of the Millelith
+        if self.active_team_artifact_set_distribution_and_buffs["tom"]["holder"] is not None:
+            buff += 20.0
+
+        # Noblesse Oblige
+        if self.active_team_artifact_set_distribution_and_buffs["noblesse"]["holder"] is not None:
+            buff += 20.0
+
+        return buff / 100.0
     @property
     def odette_off_field_atk(self) -> float:
-        return self.odette_atk
+        return (
+            self.odette_atk
+            + self.odette_base_atk * self.odette_off_field_atk_percent_value
+        )
     @property
-    def odette_stellar_swirl_crit_multiplier(self) -> float:
-        effective_cr = self.odette_cr
+    def odette_effective_cr(self) -> float:
+        cr = self.odette_cr
 
-        # Cryo Resonance: +15% Crit Rate when Odette and Diona are on the team.
-        if (
-            "diona" in self.current_configuration["members"]
-            and "odette" in self.current_configuration["members"]
-        ):
-            effective_cr += 15.0
+        # Apply team CR bonus
+        if self.is_lumine_active or self.is_diona_active or self.is_anastasya_active:
+            cr += 15.0
 
-        effective_cr = min(effective_cr, 100.0)
+        return min(cr, 100.0)
+    @property
+    def odette_crit_multiplier(self) -> float:
+        return 1.0 + (self.odette_effective_cr / 100.0) * (self.odette_cd / 100.0)
 
-        # Vodyanitsa C2: zusätzlicher Stellar-Swirl-Crit-Schaden
-        crit_damage = (
-            self.odette_cd
-            + self.vodyanitsa_stellar_swirl_crit_damage_bonus
+
+    # 3.1 Odette Damage Calcs
+    def calculate_odette_stellar_damage(self,mv: float,atk: float,on_field: bool = True,) -> float:
+        damage = (atk* (mv / 100.0)* self.calculate_stellar_damage_multiplier("odette",on_field=on_field))
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
+
+        return (damage* self.odette_crit_multiplier* self.calculate_cryo_res_multiplier)
+    # Odette - On-Field Cryo Damage
+    @property
+    def odette_on_field_cryo_damage(self) -> float:
+
+        initial_damage = (
+            self.odette_on_field_atk
+            * (self.odette_E_initial_mv / 100.0)
+            * 1.0
+            * self.general_defense_multiplier_90
+            * self.calculate_cryo_res_multiplier
+            * self.odette_crit_multiplier
         )
 
-        return 1 + effective_cr / 100.0 * crit_damage / 100.0
+        coda_dot_damage = (
+            self.odette_on_field_atk
+            * (self.odette_Coda_DoT_mv / 100.0)
+            * 1.0
+            * self.general_defense_multiplier_90
+            * self.calculate_cryo_res_multiplier
+            * self.odette_crit_multiplier
+        )
+        return initial_damage + 3.0 * coda_dot_damage
+    #Coda Finisher Hit
     @property
-    def odette_cryo_crit_multiplier(self) -> float:
-        effective_cr = self.odette_cr
-
-        # Cryo Resonance: +15% Crit Rate when Odette and Diona are on the team.
-        if (
-            "diona" in self.current_configuration["members"]
-            and "odette" in self.current_configuration["members"]
-        ):
-            effective_cr += 15.0
-
-        effective_cr = min(effective_cr, 100.0)
-
-        return 1 + effective_cr / 100.0 * self.odette_cd / 100.0
+    def odette_on_field_Coda_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_Coda_stellar_swirl_mv,
+            atk=self.odette_on_field_atk,
+            on_field=True,
+        )
+    # C1 Additional Stellar Hit
     @property
-    def odette_off_field_stellar_swirl_crit_multiplier(self) -> float:
-        effective_cr = self.odette_cr
+    def odette_on_field_C1_additional_stellar_damage(self) -> float:
+        if self.odette_constellation < 1.0:
+            return 0.0
 
-        # Cryo Resonance: +15% Crit Rate when Odette and Diona are on the team.
-        if ("diona" in self.current_configuration["members"] and "odette" in self.current_configuration["members"]):
-            effective_cr += 15.0
-
-        effective_cr = min(effective_cr, 100.0)
-        crit_damage = (self.odette_cd + self.vodyanitsa_stellar_swirl_crit_damage_bonus)
-
-        return 1 + effective_cr / 100.0 * crit_damage / 100.0
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_E_additional_mv,
+            atk=self.odette_on_field_atk,
+            on_field=True,
+        )
+    #Stellar Plume Hits
     @property
-    def odette_off_field_cryo_crit_multiplier(self) -> float:
-        effective_cr = self.odette_cr
+    def odette_on_field_plume_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_plume_stellar_swirl_mv,
+            atk=self.odette_on_field_atk,
+            on_field=True,
+        )
 
-        # Cryo Resonance: +15% Crit Rate when Odette and Diona are on the team.
-        if (
-            "diona" in self.current_configuration["members"]
-            and "odette" in self.current_configuration["members"]
-        ):
-            effective_cr += 15.0
-
-        effective_cr = min(effective_cr, 100.0)
-
-        return 1 + effective_cr / 100.0 * self.odette_cd / 100.0
+    #Stellar Wing Hits
     @property
-    def odette_em_multiplier(self) -> float:
-        em = (self.odette_em + (self.lumine_frostfall_reverberation_em_bonus if self.is_lumine_active else 0))
+    def odette_on_field_wing_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_wing_stellar_swirl_mv,
+            atk=self.odette_on_field_atk,
+            on_field=True,
+        )
 
-        # Stellar base bonus: Odette 14% + Vesna 14% + 7% Lumine
-        talent_stellar_bonus = (self.odette_talent_stellar_damage_bonus+ self.vesna_talent_stellar_damage_bonus) + (self.lumine_stellar_jubilee_talent_stellar_base_damage_mod / 100 if self.is_lumine_active else 0)
-        em_and_stellar_multiplier = (1+ 6 * em / (2000 + em)+ self.odette_total_stellar_damage_bonus / 100.0)
-        return (1 + talent_stellar_bonus / 100.0) * em_and_stellar_multiplier
+    # Stellar Hits
+    @property
+    def odette_off_field_Coda_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_Coda_stellar_swirl_mv,
+            atk=self.odette_off_field_atk,
+            on_field=False,
+        )
 
     @property
-    def odette_off_field_em_multiplier(self) -> float:
-        em = self.odette_em
+    def odette_off_field_plume_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_plume_stellar_swirl_mv,
+            atk=self.odette_off_field_atk,
+            on_field=False,
+        )
 
-        # Stellar base bonus: Odette 14% + Vesna 14% + 7% Lumine
-        talent_stellar_bonus = (self.odette_talent_stellar_damage_bonus+ self.vesna_talent_stellar_damage_bonus) + (self.lumine_stellar_jubilee_talent_stellar_base_damage_mod / 100 if self.is_lumine_active else 0)
-
-        # The EM contribution and Stellar damage bonus are added together.
-        em_and_stellar_multiplier = (1+ 6 * em / (2000 + em)+ self.odette_off_field_stellar_damage_bonus / 100.0)
-
-        return (1 + talent_stellar_bonus / 100.0) * em_and_stellar_multiplier
     @property
-    def odette_cryo_res_reduction(self) -> float:
-        reduction = 0.0
+    def odette_off_field_wing_stellar_swirl_damage(self) -> float:
+        return self.calculate_odette_stellar_damage(
+            mv=self.odette_wing_stellar_swirl_mv,
+            atk=self.odette_off_field_atk,
+            on_field=False,
+        )
+    def calculate_odette_vortex_proc_damage(self, level: int) -> float:
+        if level == 90:
+            level_modifier = self.lv90_modifier
+        elif level == 95:
+            level_modifier = self.lv95_modifier
+        else:
+            raise ValueError(f"Unsupported enemy level: {level}")
 
-        if self.is_vodyanitsa_active: 
-            reduction += self.vodyanitsa_cryo_res_reduction
+        damage = (
+            level_modifier
+            * 0.75
+            * 0.3
+            * self.calculate_stellar_damage_multiplier("odette")
+        )
 
-        if (self.is_odette_active and self.current_configuration["constellations"].get("odette", 0) >= 2):
-            reduction += self.odette_C2_cryo_res_reduction
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
 
-        if self.is_faruzan_active:
-            reduction += self.faruzan_VV_set_cryo_res_reduction
+        return (
+            damage
+            * self.calculate_stellar_crit_multiplier("odette", "cryo")
+            * self.calculate_cryo_res_multiplier
+        )
 
-        return reduction
+
+    def calculate_odette_vortex_explosion_damage(self, level: int) -> float:
+        if level == 90:
+            level_modifier = self.lv90_modifier
+        elif level == 95:
+            level_modifier = self.lv95_modifier
+        else:
+            raise ValueError(f"Unsupported enemy level: {level}")
+
+        damage = (
+            level_modifier
+            * 3.0
+            * 0.3
+            * self.calculate_stellar_damage_multiplier("odette")
+        )
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
+
+        return (
+            damage
+            * self.calculate_stellar_crit_multiplier("odette", "cryo")
+            * self.calculate_anemo_res_multiplier
+        )
 
 
     # 4. VODYANITSA – CHARACTER STATS
@@ -657,17 +950,7 @@ class VesnaTeamDPSTheorie:
     vodyanitsa_anemo_res_reduction: float = 35.0
     vodyanitsa_cryo_res_reduction: float = 30.0
     vodyanitsa_signature_atk_bonus: float = 42.0
-    vodyanitsa_C1_additional_atk: float = 520.0
     vodyanitsa_C2_stellar_reaction_cd_bonus: float = 60.0
-
-    @property
-    def vodyanitsa_stellar_swirl_crit_damage_bonus(self) -> float:
-        if (
-            self.is_vodyanitsa_active
-            and self.current_configuration["constellations"].get("vodyanitsa", 0) >= 2
-        ):
-            return self.vodyanitsa_C2_stellar_reaction_cd_bonus
-        return 0.0
 
     @property
     def active_vodyanitsa_stellar_quills_flat_damage(self) -> float:
@@ -703,8 +986,8 @@ class VesnaTeamDPSTheorie:
     sucrose_total_em_value: float = 860.0
     sucrose_dps_value: float = 2500.0
 
-    sucrose_instrcutor_em_value: float = 120.0
-    sucrose_talent_catalyst_conversion_em_value: float = 50.0
+    sucrose_instrcutor_team_buff_em_value: float = 120.0
+    sucrose_talent_catalyst_conversion_bonus_em_value: float = 50.0
     sucrose_talent_mollis_favonius_em_value: float = 172.0
 
     #7.1 Cryo Lumine
@@ -718,6 +1001,7 @@ class VesnaTeamDPSTheorie:
     #Lumine Stats
     lumine_base_atk: float = 212
     lumine_sig_base_atk: float = 608
+    lumine_base_atk_total: float = 820
     lumine_sig_base_cr_value: float = 33.1
     lumine_sig_CD_value: float = 42
     lumine_sig_atk_value: float = 40
@@ -727,7 +1011,7 @@ class VesnaTeamDPSTheorie:
     lumine_ascension_stat_atk_percent: float = 24
 
     #Stats from artifacts
-    lumine_2p2p_atk_artifact_set_bonus: float = 36.0
+    atk_2p2p_artifact_set_bonus: float = 36.0
     lumine_feather_flat_atk_bonus: float = 311
     lumine_artifact_sands_atk_value:float = 46.6
     lumine_artifact_goblet_atk_value:float = 46.6
@@ -763,93 +1047,68 @@ class VesnaTeamDPSTheorie:
         return 120
 
     @property
-    def lumine_total_CR(self) -> float:
+    def lumine_effective_cr(self) -> float:
         cr = 85.0
 
+        # Apply team CR bonus
         if self.is_odette_active or self.is_diona_active:
             cr += 15.0
 
         return min(cr, 100.0)
-    @property
-    def lumine_crit_multiplier(self) -> float:
-        return 1.0 + (
-            self.lumine_total_CR / 100.0
-        ) * (
-            self.lumine_total_CD / 100.0
-        )
 
     @property
-    def lumine_base_atk_total(self) -> float:
-        return self.lumine_base_atk + self.lumine_sig_base_atk
-     
+    def lumine_crit_multiplier(self) -> float:
+        crit_damage = (self.lumine_total_CD + self.vodyanitsa_C2_stellar_reaction_cd_bonus)
+
+        return 1.0 + (self.lumine_effective_cr / 100.0) * (crit_damage / 100.0)
+
     @property
     def lumine_total_atk(self) -> float:
         return (
             self.lumine_base_atk_total
             * (
-                1
+                1.0
                 + (
                     self.lumine_sig_atk_value
                     + self.lumine_ascension_stat_atk_percent
-                    + self.lumine_2p2p_atk_artifact_set_bonus
+                    + self.atk_2p2p_artifact_set_bonus
                     + self.lumine_pyro_talent_atk_bonus
                     + self.lumine_artifact_sands_atk_value
                     + self.lumine_artifact_goblet_atk_value
-                ) / 100
+                ) / 100.0
             )
             + self.lumine_feather_flat_atk_bonus
         )
-    @property
-    def lumine_on_field_total_atk_value(self) -> float:
-        return (
-            self.lumine_total_atk 
-            + (self.lumine_base_atk_total * self.team_atk_percent_buff / 100) 
-            )
 
     @property
-    def lumine_stellar_base_dmg_team_damage_bonus(self) -> float:
-        bonus = self.vesna_talent_stellar_damage_bonus + self.lumine_stellar_jubilee_talent_stellar_base_damage_mod
-        if self.is_odette_active:
-            bonus += 14
-        if self.is_anastasya_active: #need to wait for confirmation
-            bonus += 14
-        return bonus
+    def lumine_atk_percent_value(self) -> float:
+        return self.team_atk_percent_artifact_and_other_bonus
+
 
     @property
-    def lumine_em_multiplier(self) -> float:
-        return (1+ 6*self.lumine_total_em /(self.lumine_total_em+2000))*(1+ self.lumine_stellar_base_dmg_team_damage_bonus / 100) + (1+self.lumine_total_stellar_damage_percent_bonus/100)
-    
-    @property
-    def lumine_total_stellar_damage_percent_bonus(self) -> float:
-        bonus = 0.0
+    def lumine_on_field_atk(self) -> float:
+        return (self.lumine_total_atk + self.lumine_base_atk_total * self.lumine_atk_percent_value)
 
-        if self.is_odette_active:
-            if self.current_configuration["constellations"].get("odette", 0) >= 1:
-                stacks = self.odette_C1_marvelous_splender_stacks
-            else:
-                stacks = self.odette_marvelous_splender_stacks
-
-            bonus += stacks * self.odette_C0_stellar_damage
-            bonus += self.odette_furnace_set_stellar_damage_bonus
-
-        #if (self.is_diona_active and self.current_configuration["constellations"].get("diona", 0) >= 6):
-        #   bonus += self.diona_C6_stellar_damage_bonus
-
-        if self.is_diona_active or self.is_faruzan_active:
-            bonus += self.faruzan_breezeborne_r5_stellar_damage_bonus
-
-        return bonus
-
+    #7.1.1 Lumine Damage calcs for E CA Q
+    #Damage Calc for Stellar CA
     @property
     def lumine_stellar_charge_attack_damage(self) -> float:
-        damage = (self.lumine_on_field_total_atk_value * (self.lumine_mv_stellar_CA_mv_with_talent / 100.0) * self.lumine_em_multiplier)
+        damage = (
+            self.lumine_on_field_atk
+            * (self.lumine_mv_stellar_CA_mv_with_talent / 100.0)
+            * self.calculate_stellar_damage_multiplier("lumine")
+        )
 
-        return (damage * self.lumine_crit_multiplier * self.calculate_cryo_res_multiplier())
-
+        return (
+            damage
+            * self.lumine_crit_multiplier
+            * self.calculate_cryo_res_multiplier
+        )
+    #Damage Calc for E-Skill
     @property
     def lumine_e_skill_cryo_damage_on_field(self) -> float:
         damage = (
-            self.lumine_on_field_total_atk_value
+            self.lumine_on_field_atk
             * (self.lumine_mv_E_Skill_On_field_inital_mv_value / 100.0)
         )
 
@@ -857,9 +1116,10 @@ class VesnaTeamDPSTheorie:
             damage
             * self.lumine_crit_multiplier
             * self.general_defense_multiplier_90
-            * self.calculate_cryo_res_multiplier()
+            * self.calculate_cryo_res_multiplier
         )
 
+    #Damage Calc for E-Skill off-field
     @property
     def lumine_e_skill_cryo_damage_off_field(self) -> float:
         damage_per_tick = (
@@ -872,9 +1132,10 @@ class VesnaTeamDPSTheorie:
             * self.lumine_mv_E_Skill_off_fiel_periodic_tick_amount
             * self.lumine_crit_multiplier
             * self.general_defense_multiplier_90
-            * self.calculate_cryo_res_multiplier()
+            * self.calculate_cryo_res_multiplier
         )
 
+    #Damage Calc for Stellar Q
     @property
     def lumine_ultimate_q_stellar_damage(self) -> float:
         total_mv = (
@@ -888,16 +1149,16 @@ class VesnaTeamDPSTheorie:
         )
 
         damage = (
-            self.lumine_on_field_total_atk_value
+            self.lumine_on_field_atk
             * (total_mv / 100.0)
-            * self.lumine_em_multiplier
-            * (1 + frostglow_bonus / 100.0)
+            * self.calculate_stellar_damage_multiplier("lumine")
+            * (1.0 + frostglow_bonus / 100.0)
         )
 
         return (
             damage
             * self.lumine_crit_multiplier
-            * self.calculate_cryo_res_multiplier()
+            * self.calculate_cryo_res_multiplier
         )
     @property
     def lumine_rotation_damage(self) -> float:
@@ -914,189 +1175,16 @@ class VesnaTeamDPSTheorie:
         """Average DPS of Lumine over a 19.5-second rotation."""
         return self.lumine_rotation_damage / 19.5
 
-    # 8. Team Comps and definitions
-    TEAMS: ClassVar[list[dict]] = [
-        {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
-         "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
 
-        {"name": "Vesna_Odette_Vodyanitsa_Diona",
-         "members": ["vesna", "odette", "vodyanitsa", "diona"]},
-
-        {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
-         "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
-
-        {"name": "Vesna_Odette_Faruzan_Diona",
-         "members": ["vesna", "odette", "faruzan", "diona"]},
-
-        {"name": "Vesna_Odette_Faruzan_Sucrose",
-         "members": ["vesna", "odette", "faruzan", "sucrose"]},
-
-        {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
-         "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
-
-        {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
-         "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
-
-        {"name": "Vesna_Odette_Diona_Sucrose",
-         "members": ["vesna", "odette", "diona", "sucrose"]},
-
-        {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
-         "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
-
-        {"name": "Vesna_Faruzan_Diona_Sucrose",
-         "members": ["vesna", "faruzan", "diona", "sucrose"]},
-
-        {"name": "Vesna_Odette_Vodyanitsa_Lumine",
-         "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
-
-        {"name": "Vesna_Odette_Faruzan_Lumine",
-         "members": ["vesna", "odette", "faruzan", "lumine"]},
-
-        {"name": "Vesna_Odette_Diona_Lumine",
-         "members": ["vesna", "odette", "diona", "lumine"]},
-
-        {"name": "Vesna_Odette_Sucrose_Lumine",
-         "members": ["vesna", "odette", "sucrose", "lumine"]},
-
-        {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
-         "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
-
-        {"name": "Vesna_Vodyanitsa_Diona_Lumine",
-         "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
-
-        {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
-         "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
-
-        {"name": "Vesna_Faruzan_Diona_Lumine",
-         "members": ["vesna", "faruzan", "diona", "lumine"]},
-
-        {"name": "Vesna_Faruzan_Sucrose_Lumine",
-         "members": ["vesna", "faruzan", "sucrose", "lumine"]},
-
-        {"name": "Vesna_Diona_Sucrose_Lumine",
-         "members": ["vesna", "diona", "sucrose", "lumine"]},
-    ]
-
-    VESNA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
-    ODETTE_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
-    VODYANITSA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
-
-    team_name: str = "Vesna_Odette_Vodyanitsa_Faruzan"
-    current_configuration: dict = field(default_factory=dict)
-
-    # 9. VESNA – STATS AND DAMAGE MULTIPLIERS
-    def print_vesna_damage_breakdown(self) -> None:
-        """Displays Vesna's stats, damage bonuses, and damage breakdown."""
-
-        def section(title):
-            print(f"\n{'=' * 18} {title} {'=' * 18}")
-
-        def show(label, value):
-            print(f"{label:<42} {value}")
-
-        section("TEAM")
-        show("Active team members", self.active_team_members)
-        show("Odette active", self.is_odette_active)
-        show("Faruzan active", self.is_faruzan_active)
-        show("Diona active", self.is_diona_active)
-
-        section("ATK")
-        show("Base ATK", self.vesna_base_atk_value)
-        show("ATK% bonus", self.vesna_atk_percent_value)
-        show("Team ATK% bonus", self.team_atk_percent_buff)
-        show("Flat ATK from Feather", self.vesna_flat_atk_feather)
-        show("Other flat ATK", self.flat_attack_value)
-        show("Total ATK", self.vesna_total_atk_value)
-
-        section("STELLAR DAMAGE")
-        show("Artifact bonus", self.vesna_artifact_set_stellar_bonus)
-        show("Weapon bonus", self.vesna_weapon_stellar_bonus)
-        show("Team bonus", self.team_stellar_damage_bonus_vesna)
-        show("Total Stellar damage bonus (%)", self.vesna_total_stellar_bonus)
-        show("Elemental Mastery", self.vesna_em_value)
-        show("Stellar damage multiplier", self.stellar_damage_multiplier)
-
-        section("CRIT")
-        show("Crit Rate (%)", self.crit_rate * 100)
-        show("Crit DMG (%)", self.vesna_crit_damage_value)
-        show("Stellar Crit multiplier", self.stellar_crit_multiplier)
-        show("Anemo Crit multiplier", self.anemo_crit_multiplier)
-        show("Vodyanitsa Stellar Swirl Crit DMG bonus",self.vodyanitsa_stellar_swirl_crit_damage_bonus)
-
-        section("RESISTANCE REDUCTION")
-        show("Faruzan active", self.is_faruzan_active)
-        show("Vodyanitsa active", self.is_vodyanitsa_active)
-        show("Odette active", self.is_odette_active)
-        show("Anemo RES reduction – Faruzan", self.faruzan_anemo_res_reduction)
-        show("Anemo RES reduction – Vodyanitsa", self.vodyanitsa_anemo_res_reduction)
-        show("Anemo RES reduction – Odette C2", self.odette_C2_anemo_res_reduction)
-        show("Total Anemo RES reduction", self.vesna_anemo_res_reduction)
-        show("Cryo RES reduction – Vodyanitsa", self.vodyanitsa_cryo_res_reduction)
-        show("Cryo RES reduction – Odette C2", self.odette_C2_cryo_res_reduction)
-        show("Cryo RES reduction – Faruzan VV", self.faruzan_VV_set_cryo_res_reduction)
-        show("Total Cryo RES reduction", self.vesna_cryo_res_reduction)
-
-
-        section("DAMAGE BREAKDOWN")
-        show("Anemo damage", self.calculate_anemo_damage_lv95())
-        show("Stellar damage", self.vesna_total_stellar_damage)
-        show("Vortex damage", self.calculate_vesna_total_vortex_damage(95))
-        show("Total damage", self.calculate_total_vesna_damage())
-
-        section("END")
-
-        level = 95
-
-        if level == 90:
-            level_modifier = self.lv90_modifier
-        elif level == 95:
-            level_modifier = self.lv95_modifier
-        else:
-            raise ValueError(f"Unsupported enemy level: {level}")
-
-        vortex_proc_base = level_modifier * 0.75 * 0.6
-        vortex_explosion_base = level_modifier * 3.0 * 0.6
-
-        vortex_damage_bonus = (
-            1.0 + (self.vesna_talent_stellar_damage_bonus+ self.active_odette_talent_stellar_damage_bonus) / 100.0)
-
-        vortex_res_multiplier = self.calculate_cryo_res_multiplier()
-
-        section("ODETTE – DAMAGE BREAKDOWN")
-
-        show("Level", self.odette_lv)
-        show("On-Field ATK", self.odette_on_field_atk)
-        show("Off-Field ATK", self.odette_off_field_atk)
-        show("Elemental Mastery", self.odette_em)
-        show("Crit Rate (%)", self.odette_cr)
-        show("Crit DMG (%)", self.odette_cd)
-
-        # Damage Bonuses
-        show("On-Field Stellar DMG Bonus (%)", self.odette_total_stellar_damage_bonus)
-        show("Off-Field Stellar DMG Bonus (%)", self.odette_off_field_stellar_damage_bonus)
-        show("Talent Stellar DMG Bonus (%)", self.active_odette_talent_stellar_damage_bonus)
-        show("Cryo RES Reduction (%)", self.odette_cryo_res_reduction)
-
-        # E Damage
-        show("Coda Stellar Swirl (On-Field)", self.odette_on_field_Coda_stellar_swirl_damage)
-        show("Plume Stellar Swirl (On-Field, per hit)", self.odette_on_field_plume_stellar_swirl_damage)
-        show("Wing Stellar Swirl (On-Field, per hit)", self.odette_on_field_wing_stellar_swirl_damage)
-
-        show("Coda Stellar Swirl (Off-Field)", self.odette_off_field_Coda_stellar_swirl_damage)
-        show("Plume Stellar Swirl (Off-Field, per hit)", self.odette_off_field_plume_stellar_swirl_damage)
-        show("Wing Stellar Swirl (Off-Field, per hit)", self.odette_off_field_wing_stellar_swirl_damage)
-
-        section("END")
-
+    # 8. VESNA – STATS AND DAMAGE MULTIPLIERS
     @property
     def vesna_atk_percent_value(self) -> float:
         return (
             self.atk_percent_sands
             + self.atk_percent_goblet
             + self.atk_percent_set_bonus
-            + self.atk_percent_vesna_a3_solo
             + self.atk_percent
-        )
+        ) / 100.0 + self.team_atk_percent_artifact_and_other_bonus
 
     @property
     def vesna_base_atk_value(self) -> float:
@@ -1104,18 +1192,14 @@ class VesnaTeamDPSTheorie:
             return self.base_atk_lv_90
         elif self.level == self.vesna_level_95:
             return self.base_atk_lv_95
+
         raise ValueError(f"Unsupported Vesna level: {self.level}")
 
     @property
     def vesna_total_atk_value(self) -> float:
-        total_atk_percent = (
-            self.vesna_atk_percent_value
-            + self.team_atk_percent_buff
-        )
-
         return (
             self.vesna_base_atk_value
-            * (1.0 + total_atk_percent / 100.0)
+            * (1.0 + self.vesna_atk_percent_value)
             + self.vesna_flat_atk_feather
             + self.flat_attack_value
         )
@@ -1125,27 +1209,7 @@ class VesnaTeamDPSTheorie:
         return (
             self.vesna_base_em
             + self.elemental_mastery
-            + self.team_em_buff_vesna
-            + (self.lumine_frostfall_reverberation_em_bonus_after_stellar_damage if self.is_lumine_active
-                else 0
-            )
-        )
-
-    @property
-    def vesna_total_stellar_bonus(self) -> float:
-        return (
-            self.vesna_artifact_set_stellar_bonus
-            + self.vesna_weapon_stellar_bonus
-            + self.team_stellar_damage_bonus_vesna
-        )
-
-    @property
-    def stellar_damage_multiplier(self) -> float:
-        return (
-            1.0
-            + (6.0 * self.vesna_em_value)
-            / (self.vesna_em_value + 2000.0)
-            + self.vesna_total_stellar_bonus / 100.0
+            + self.team_em_buff("vesna")
         )
 
     @property
@@ -1159,97 +1223,56 @@ class VesnaTeamDPSTheorie:
         )
 
     @property
-    def stellar_crit_multiplier(self) -> float:
-        crit_damage = (
-            self.vesna_crit_damage_value
-            + self.vodyanitsa_stellar_swirl_crit_damage_bonus
-        )
+    def vesna_stellar_crit_multiplier(self) -> float:
+        crit_damage = (self.vesna_crit_damage_value + self.vodyanitsa_C2_stellar_reaction_cd_bonus)
 
-        if (
-            self.is_faruzan_active
-            and self.current_configuration["constellations"].get("faruzan", 0) >= 6
-        ):
+        if self.is_faruzan_active:
             crit_damage += self.faruzan_c6_anemo_crit_damage
 
         return 1.0 + crit_damage / 100.0
 
     @property
-    def anemo_crit_multiplier(self) -> float:
+    def vesna_anemo_crit_multiplier(self) -> float:
         crit_damage = self.vesna_crit_damage_value
 
-        if (
-            self.is_faruzan_active
-            and self.current_configuration["constellations"].get("faruzan", 0) >= 6
-        ):
+        if self.is_faruzan_active:
             crit_damage += self.faruzan_c6_anemo_crit_damage
 
         return 1.0 + crit_damage / 100.0
 
-
-
-    # 10. VESNA – DAMAGE CALCULATIONS
+    # 8.1 Vesna damage calcs
     def calculate_anemo_damage_lv90(self) -> float:
         return (
             self.vesna_total_atk_value
             * (self.anemo_mv / 100.0)
-            * self.anemo_crit_multiplier
+            * self.vesna_anemo_crit_multiplier
             * self.general_defense_multiplier_90
+            * self.calculate_anemo_res_multiplier
         )
     def calculate_anemo_damage_lv95(self) -> float:
         return (
             self.vesna_total_atk_value
             * (self.anemo_mv / 100.0)
-            * self.anemo_crit_multiplier
+            * self.vesna_anemo_crit_multiplier
             * self.general_defense_multiplier_95
+            * self.calculate_anemo_res_multiplier
         )
-    @property
-    def vesna_anemo_res_reduction(self) -> float:
-        reduction = 0.0
-
-        if self.is_faruzan_active:
-            reduction += self.faruzan_anemo_res_reduction
-
-        if self.is_vodyanitsa_active:
-            reduction += self.vodyanitsa_anemo_res_reduction
-
-        if (
-            self.is_odette_active
-            and self.current_configuration["constellations"].get("odette", 0) >= 2
-        ):
-            reduction += self.odette_C2_anemo_res_reduction
-
-        return reduction
-    @property
-    def vesna_cryo_res_reduction(self) -> float:
-        reduction = 0.0
-
-        if self.is_vodyanitsa_active:
-            reduction += self.vodyanitsa_cryo_res_reduction
-
-        if (
-            self.is_odette_active
-            and self.current_configuration["constellations"].get("odette", 0) >= 2
-        ):
-            reduction += self.odette_C2_cryo_res_reduction
-
-        if self.is_faruzan_active:
-            reduction += self.faruzan_VV_set_cryo_res_reduction
-
-        return reduction
     @property
     def vesna_total_stellar_damage(self) -> float:
         total_atk = self.vesna_total_atk_value
 
+        # Vesna C2 additional ATK
         if self.vesna_constellation >= 2.0:
             total_atk += (
                 self.vesna_base_atk_value
-                * (1.0 + self.vesna_atk_percent_value / 100.0)
+                * (1.0 + self.vesna_atk_percent_value)
                 * self.vesna_C2_atk_value
                 / 100.0
             )
 
         e_damage_mv = self.e_stellar_mv
 
+        # Determine Stellar multipliers
         se1_multiplier = (
             self.se_stage_0_multiplier
             if self.vesna_constellation >= 2.0
@@ -1301,85 +1324,79 @@ class VesnaTeamDPSTheorie:
             + se3_base_mv * se3_stage3_multiplier
         )
 
+        # Vesna C1 additional Stellar damage
         if self.vesna_constellation >= 1.0:
             total_mv += self.vesna_C1_additional_stellar_mv
 
-        return (
-            (
-                (
-                    total_atk
-                    * (total_mv / 100.0)
-                    * self.stellar_damage_multiplier
-                    * (
-                        1.0
-                        + (
-                            self.vesna_talent_stellar_damage_bonus
-                            + self.active_odette_talent_stellar_damage_bonus
-                        ) / 100.0
-                    )
-                    + self.vodyanitsa_stellar_quills_active
-                )
-                * self.stellar_crit_multiplier
-            )
-            * self.calculate_anemo_res_multiplier()
+        damage = (
+            total_atk
+            * (total_mv / 100.0)
+            * self.calculate_stellar_damage_multiplier("vesna")
         )
-    def calculate_vortex_proc_damage(self, level: int) -> float:
-        if level == 90:
-            level_modifier = self.lv90_modifier
-        elif level == 95:
-            level_modifier = self.lv95_modifier
-        else:
-            raise ValueError(f"Unsupported enemy level: {level}")
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
 
         return (
-            (
-                level_modifier * 0.75 * 0.6
-                * self.stellar_damage_multiplier
-                * (
-                    1.0
-                    + (
-                        self.vesna_talent_stellar_damage_bonus
-                        + self.active_odette_talent_stellar_damage_bonus
-                    ) / 100.0
-                )
-                + self.vodyanitsa_stellar_quills_active
-            )
-            * self.calculate_cryo_res_multiplier()
+            damage
+            * self.calculate_stellar_crit_multiplier("vesna", "anemo")
+            * self.calculate_anemo_res_multiplier
         )
-    def calculate_vortex_explosion_damage(self, level: int) -> float:
-        if level == 90:
+
+    def calculate_vortex_proc_damage(self) -> float:
+        if self.level == self.vesna_level_90:
             level_modifier = self.lv90_modifier
-        elif level == 95:
+        elif self.level == self.vesna_level_95:
             level_modifier = self.lv95_modifier
         else:
-            raise ValueError(f"Unsupported character level: {level}")
+            raise ValueError(f"Unsupported Vesna level: {self.level}")
+
+        damage = (
+            level_modifier
+            * 0.75
+            * 0.6
+            * self.calculate_stellar_damage_multiplier("vesna")
+        )
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
 
         return (
-            (
-                level_modifier * 3.0 * 0.6
-                * self.stellar_damage_multiplier
-                * (
-                    1.0
-                    + (
-                        self.vesna_talent_stellar_damage_bonus
-                        + self.active_odette_talent_stellar_damage_bonus
-                    ) / 100.0
-                )
-                + self.vodyanitsa_stellar_quills_active
-            )
-            * self.calculate_cryo_res_multiplier()
-         )
+            damage
+            * self.calculate_stellar_crit_multiplier("vesna", "cryo")
+            * self.calculate_cryo_res_multiplier
+        )
+    def calculate_vortex_explosion_damage(self) -> float:
+        if self.level == self.vesna_level_90:
+            level_modifier = self.lv90_modifier
+        elif self.level == self.vesna_level_95:
+            level_modifier = self.lv95_modifier
+        else:
+            raise ValueError(f"Unsupported Vesna level: {self.level}")
+
+        damage = (
+            level_modifier
+            * 3.0
+            * 0.6
+            * self.calculate_stellar_damage_multiplier("vesna")
+        )
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        damage += self.active_vodyanitsa_stellar_quills_flat_damage
+
+        return (
+            damage
+            * self.calculate_stellar_crit_multiplier("vesna", "cryo")
+            * self.calculate_anemo_res_multiplier
+        )
   
-    def calculate_vesna_total_vortex_damage(self, level: int) -> float:
-        return (
-            self.calculate_vortex_proc_damage(level) * self.vortex_procs
-            + self.calculate_vortex_explosion_damage(level)
-            * self.vortex_explosions
-        )    
+    def calculate_vesna_total_vortex_damage(self) -> float:
+        return (self.calculate_vortex_proc_damage() * self.vortex_procs+ self.calculate_vortex_explosion_damage()* self.vortex_explosions)    
+
     def calculate_total_vesna_damage(self, verbose: bool = False) -> float:
         anemo_damage = self.calculate_anemo_damage_lv95()
         stellar_damage = self.vesna_total_stellar_damage
-        vortex_damage = self.calculate_vesna_total_vortex_damage(95)
+        vortex_damage = self.calculate_vesna_total_vortex_damage()
 
         total_damage = (
             anemo_damage
@@ -1396,109 +1413,6 @@ class VesnaTeamDPSTheorie:
         return total_damage
     
 
-    # 11. ODETTE – DAMAGE CALCULATIONS
-    def calculate_odette_stellar_damage(
-        self,mv: float,atk: float,em_multiplier: float,crit_multiplier: float = 0.0,) -> float:
-        cryo_resistance_multiplier = self.calculate_cryo_res_multiplier()
-
-        damage = (atk * (mv / 100.0) * em_multiplier + self.vodyanitsa_stellar_quills_active)
-
-        return damage * crit_multiplier * cryo_resistance_multiplier
-
-    # 11.1 ON-FIELD – Coda Finisher Hit
-    @property
-    def odette_on_field_Coda_stellar_swirl_damage(self) -> float:
-        quills = (self.vodyanitsa_stellar_quills_active * 2 if self.is_vodyanitsa_active else 0.0)
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_Coda_stellar_swirl_mv,
-            atk=self.odette_on_field_atk,
-            em_multiplier=self.odette_em_multiplier,
-            crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-        )
-
-    # 11.2 ON-FIELD – Stellar Plume Hits
-    @property
-    def odette_on_field_plume_stellar_swirl_damage(self) -> float:
-        quills = (
-            self.vodyanitsa_stellar_quills_active * 2
-            if self.is_vodyanitsa_active
-            else 0.0
-        )
-
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_plume_stellar_swirl_mv,
-            atk=self.odette_on_field_atk,
-            em_multiplier=self.odette_em_multiplier,
-            crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-        )
-
-    # 11.3 ON-FIELD – Stellar Wing Hits
-    @property
-    def odette_on_field_wing_stellar_swirl_damage(self) -> float:
-        quills = (
-            self.vodyanitsa_stellar_quills_active * 2
-            if self.is_vodyanitsa_active
-            else 0.0
-        )
-
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_wing_stellar_swirl_mv,
-            atk=self.odette_on_field_atk,
-            em_multiplier=self.odette_em_multiplier,
-            crit_multiplier=self.odette_stellar_swirl_crit_multiplier,
-        )
-
-
-
-
-    # 11.4 OFF-FIELD – Stellar Hits
-    @property
-    def odette_off_field_Coda_stellar_swirl_damage(self) -> float:
-        quills = (
-            self.vodyanitsa_stellar_quills_active * 2
-            if self.is_vodyanitsa_active
-            else 0.0
-        )
-
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_Coda_stellar_swirl_mv,
-            atk=self.odette_off_field_atk,
-            em_multiplier=self.odette_off_field_em_multiplier,
-            crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-        )
-
-
-    @property
-    def odette_off_field_plume_stellar_swirl_damage(self) -> float:
-        quills = (
-            self.vodyanitsa_stellar_quills_active * 2
-            if self.is_vodyanitsa_active
-            else 0.0
-        )
-
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_plume_stellar_swirl_mv,
-            atk=self.odette_off_field_atk,
-            em_multiplier=self.odette_off_field_em_multiplier,
-            crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-        )
-
-
-    @property
-    def odette_off_field_wing_stellar_swirl_damage(self) -> float:
-        quills = (
-            self.vodyanitsa_stellar_quills_active * 2
-            if self.is_vodyanitsa_active
-            else 0.0
-        )
-
-        return self.calculate_odette_stellar_damage(
-            mv=self.odette_wing_stellar_swirl_mv,
-            atk=self.odette_off_field_atk,
-            em_multiplier=self.odette_off_field_em_multiplier,
-            crit_multiplier=self.odette_off_field_stellar_swirl_crit_multiplier,
-        )
-
     # 12. TEAM CONFIGURATIONS AND CONSTELLATIONS
     @property
     def active_team(self) -> dict:
@@ -1514,7 +1428,81 @@ class VesnaTeamDPSTheorie:
     def active_team_members(self) -> list[str]:
         return self.active_team["members"]
 
-    @property
+    # 8. Team Comps and definitions
+    # TEAMS: ClassVar[list[dict]] = [
+    #     {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
+    #      "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
+
+    #     {"name": "Vesna_Odette_Vodyanitsa_Diona",
+    #      "members": ["vesna", "odette", "vodyanitsa", "diona"]},
+
+    #     {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
+    #      "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
+
+    #     {"name": "Vesna_Odette_Faruzan_Diona",
+    #      "members": ["vesna", "odette", "faruzan", "diona"]},
+
+    #     {"name": "Vesna_Odette_Faruzan_Sucrose",
+    #      "members": ["vesna", "odette", "faruzan", "sucrose"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
+    #      "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
+    #      "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
+
+    #     {"name": "Vesna_Odette_Diona_Sucrose",
+    #      "members": ["vesna", "odette", "diona", "sucrose"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
+    #      "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
+
+    #     {"name": "Vesna_Faruzan_Diona_Sucrose",
+    #      "members": ["vesna", "faruzan", "diona", "sucrose"]},
+
+    #     {"name": "Vesna_Odette_Vodyanitsa_Lumine",
+    #      "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
+
+    #     {"name": "Vesna_Odette_Faruzan_Lumine",
+    #      "members": ["vesna", "odette", "faruzan", "lumine"]},
+
+    #     {"name": "Vesna_Odette_Diona_Lumine",
+    #      "members": ["vesna", "odette", "diona", "lumine"]},
+
+    #     {"name": "Vesna_Odette_Sucrose_Lumine",
+    #      "members": ["vesna", "odette", "sucrose", "lumine"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
+    #      "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Diona_Lumine",
+    #      "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
+
+    #     {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
+    #      "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
+
+    #     {"name": "Vesna_Faruzan_Diona_Lumine",
+    #      "members": ["vesna", "faruzan", "diona", "lumine"]},
+
+    #     {"name": "Vesna_Faruzan_Sucrose_Lumine",
+    #      "members": ["vesna", "faruzan", "sucrose", "lumine"]},
+
+    #     {"name": "Vesna_Diona_Sucrose_Lumine",
+    #      "members": ["vesna", "diona", "sucrose", "lumine"]},
+    # ]
+    TEAMS: ClassVar[list[dict]] = [
+
+        {"name": "Vesna_Odette_Faruzan_Diona",
+         "members": ["vesna", "odette", "faruzan", "diona"]},
+       ]
+
+    VESNA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
+    ODETTE_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
+    VODYANITSA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
+
+    team_name: str = "Vesna_Odette_Vodyanitsa_Faruzan"
+    current_configuration: dict = field(default_factory=dict)
+    @property  # Include every team configuration
     def all_team_configurations(self) -> list[dict]:
         configurations = []
 
@@ -1554,152 +1542,6 @@ class VesnaTeamDPSTheorie:
 
         return configurations
 
-    @property
-    def vesna_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "vesna", 0
-            )
-        )
-
-    @property
-    def odette_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "odette", 0
-            )
-        )
-
-    @property
-    def vodyanitsa_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "vodyanitsa", 0
-            )
-        )
-
-    
-    @property
-    def active_team_members(self) -> list[str]:
-        return self.active_team["members"]
-
-    @property
-    def is_diona_active(self) -> bool:
-        return "diona" in self.active_team_members
-
-    @property
-    def is_faruzan_active(self) -> bool:
-        return "faruzan" in self.active_team_members
-
-    @property
-    def is_sucrose_active(self) -> bool:
-        return "sucrose" in self.active_team_members
-
-    @property
-    def is_vodyanitsa_active(self) -> bool:
-        return "vodyanitsa" in self.active_team_members
-
-    @property
-    def is_odette_active(self) -> bool:
-        return "odette" in self.active_team_members
-
-    @property
-    def is_lumine_active(self) -> bool:
-        return "lumine" in self.active_team_members
-
-    @property
-    def is_anastasya_active(self) -> bool:
-        return "anastasya" in self.active_team_members
-    
-
-
-
-
-    @property
-    def team_atk_percent_buff(self) -> float:
-        """ATK% buffs for active team members."""
-        buff = 0.0
-
-        if self.is_diona_active:
-            buff += self.diona_tom_set_atk_buff
-
-        if self.is_vodyanitsa_active:
-            buff += self.vodyanitsa_signature_atk_bonus
-
-        if (
-            self.is_odette_active
-            and self.current_configuration["constellations"].get("odette", 0) >= 2
-        ):
-            buff += self.odette_C2_marvelous_splender_stacks_atk_percent * 6
-
-        return buff
-
-    @property
-    def team_em_buff_vesna(self) -> float:
-        buff = 0.0
-
-        if self.is_diona_active:
-            buff += self.diona_C6_EM_value
-
-        if self.is_sucrose_active:
-            buff += (
-                self.sucrose_talent_catalyst_conversion_em_value
-                + self.sucrose_talent_mollis_favonius_em_value
-            ) * 0.50
-
-            buff += self.sucrose_instrcutor_em_value * 0.80
-
-        return buff
-
-    @property
-    def team_em_buff_odette(self) -> float:
-        buff = 0.0
-
-        if (
-            self.is_diona_active
-        ):
-            buff += self.diona_C6_EM_value
-
-        if self.is_sucrose_active:
-            buff += (
-                self.sucrose_talent_catalyst_conversion_em_value
-                + self.sucrose_talent_mollis_favonius_em_value
-                + self.sucrose_instrcutor_em_value
-            )
-
-        return buff
-
-    @property
-    def team_stellar_damage_bonus_vesna(self) -> float:
-        """Team-wide Stellar damage bonuses for Vesna."""
-        buff = 0.0
-
-        if self.is_odette_active:
-            stacks = (
-                self.odette_C1_marvelous_splender_stacks
-                if self.odette_constellation >= 1
-                else self.odette_marvelous_splender_stacks
-            )
-
-            buff += self.odette_C0_stellar_damage * stacks
-            buff += self.odette_furnace_set_stellar_damage_bonus
-
-        if self.is_diona_active:
-            buff += self.diona_C6_stellar_damage_bonus
-
-        if self.is_faruzan_active:
-            buff += self.faruzan_breezeborne_r5_stellar_damage_bonus
-
-        if (
-            self.is_lumine_active
-            and self.current_configuration["constellations"].get("lumine", 0) >= 6
-        ):
-            buff += 40.0
-
-        return buff    
-
-
-
 # COMBINATORICS: GENERATE DISTRIBUTIONS
 def calculate_distributions(line_type):
     """
@@ -1719,8 +1561,7 @@ def calculate_distributions(line_type):
 
     suffix = "3line" if line_type == "3_line" else "4line"
 
-    # CR% and ER% are fixed and are no longer treated
-    # as variable distribution dimensions.
+    # CR% and ER% are fixed and are no longer treated as variable distribution dimensions.
     fixed_stats = {
         "CR%": 11,
         "ER%": 2,
@@ -1849,8 +1690,7 @@ def calculate_relevant_distributions(line_type):
 
     def generate(index, remaining):
         if index == len(relevant_stats):
-            # The remaining rolls must fit within the capacity
-            # of the irrelevant stats.
+            # The remaining rolls must fit within the capacity of the irrelevant stats.
             if 0 <= remaining <= irrelevant_capacity:
                 yield current.copy()
             return
@@ -1908,9 +1748,8 @@ def generate_artifact_profiles(main_stat, line_type):
             if fourth_stat is not None:
                 lines.append(fourth_stat)
 
-            # Drei-Linien-Artefakt:
-            # 1 Verbesserung auf +4, danach 4 weitere.
-            # Vier-Linien-Artefakt: 5 Verbesserungen.
+            # 3 line Artifacts 4 total upgrad + fourth stat
+            # 4 Line Artifacts 5 total upgrades
             upgrade_count = 4 if line_type == "3_line" else 5
 
             counts = {stat: 0 for stat in ARTIFACT_SUBSTATS}
@@ -2198,21 +2037,9 @@ def find_best_dps_profile(profiles, line_type, team_config):
         if dps > best_dps:
             best_dps = dps
             best_profile = profile
-
-        if index % 1000 == 0 or index == total_profiles:
-            print(
-                f"\rEvaluated: {index:,}/{total_profiles:,} profiles",
-                end="",
-                flush=True,
-            )
-
     print()
 
     constellations = team_config["constellations"]
-    print("DEBUG team_config:", team_config)
-    print("DEBUG team_name:", team_config.get("team_name"))
-    print("DEBUG config_name:", team_config.get("name"))
-    print("DEBUG members:", team_config.get("members"))
 
     print("\n" + "=" * 60)
     print("BEST ARTIFACT PROFILE")
@@ -2228,6 +2055,8 @@ def find_best_dps_profile(profiles, line_type, team_config):
     print(f"Best Profile (ATK, ATK%, CD%, EM, CR%, ER%): {best_profile}")
     print(f"Maximum Rotation Damage: {best_dps * rotation_time:,.2f}")
     print(f"Maximum Vesna DPS: {best_dps:,.2f}")
+
+
 
     if best_profile is not None:
         (
@@ -2270,11 +2099,11 @@ def find_best_dps_profile(profiles, line_type, team_config):
             team_name=team_config["team_name"],
             current_configuration=team_config.copy(),
         )
-
-        print("DEBUG: Team damage calculation erreicht")
+        print("=== VESNA RES DEBUG ===")
+        print("Odette Constellation:", best_vesna.odette_constellation)
+        print("Anemo RES Multiplier:", best_vesna.calculate_anemo_res_multiplier)
         # Team damage calculation
         members = set(team_config["members"])
-        print("DEBUG members:", members)
         vesna_rotation_damage = (
             best_vesna.calculate_total_vesna_damage()
         )
@@ -2283,10 +2112,16 @@ def find_best_dps_profile(profiles, line_type, team_config):
         # Odette - Stellar damage
         odette_on_field_stellar = (
             best_vesna.odette_on_field_Coda_stellar_swirl_damage
-            + best_vesna.odette_plume_hits
-            * best_vesna.odette_on_field_plume_stellar_swirl_damage
-            + best_vesna.odette_wing_hits
-            * best_vesna.odette_on_field_wing_stellar_swirl_damage
+            + best_vesna.odette_on_field_C1_additional_stellar_damage
+        )
+
+        # Odette - On-Field Cryo damage
+        odette_on_field_cryo = best_vesna.odette_on_field_cryo_damage
+
+        # Odette Total on-field damage
+        odette_on_field_total = (
+            odette_on_field_stellar
+            + odette_on_field_cryo
         )
 
         odette_off_field_stellar = (
@@ -2296,13 +2131,29 @@ def find_best_dps_profile(profiles, line_type, team_config):
             + best_vesna.odette_wing_stellar_hits
             * best_vesna.odette_off_field_wing_stellar_swirl_damage
         )
+        #Odette Debug
+        print("Coda:", best_vesna.odette_off_field_Coda_stellar_swirl_damage)
+        print("Plume total:", best_vesna.odette_plume_stellar_hits * best_vesna.odette_off_field_plume_stellar_swirl_damage)
+        print("Wing total:", best_vesna.odette_wing_stellar_hits * best_vesna.odette_off_field_wing_stellar_swirl_damage)
+        print("Off-Field total:", odette_off_field_stellar)
+        print("Off-Field ATK:", best_vesna.odette_off_field_atk)
+        print("Odette EM:", best_vesna.odette_em)
+        print("Off-Field Stellar Multiplier:", best_vesna.calculate_stellar_damage_multiplier("odette", on_field=False))
+        print("Odette Crit Multiplier:", best_vesna.odette_crit_multiplier)
+        print("Cryo RES Multiplier:", best_vesna.calculate_cryo_res_multiplier)
+
+        # Lumine Damage Breakdown
+        lumine_stellar_charge_attack = (best_vesna.lumine_stellar_charge_attack_damage if "lumine" in members else 0.0)
+        lumine_e_skill_on_field = (best_vesna.lumine_e_skill_cryo_damage_on_field if "lumine" in members else 0.0)
+        lumine_e_skill_off_field = (best_vesna.lumine_e_skill_cryo_damage_off_field if "lumine" in members else 0.0)
+        lumine_ultimate_q = (best_vesna.lumine_ultimate_q_stellar_damage if "lumine" in members else 0.0)
 
         # Lumine - Cryo and Stellar damage
         lumine_rotation_damage = (
-            best_vesna.lumine_stellar_charge_attack_damage
-            + best_vesna.lumine_e_skill_cryo_damage_on_field
-            + best_vesna.lumine_e_skill_cryo_damage_off_field
-            + best_vesna.lumine_ultimate_q_stellar_damage
+            lumine_stellar_charge_attack
+            + lumine_e_skill_on_field
+            + lumine_e_skill_off_field
+            + lumine_ultimate_q
         )
 
         print("\n" + "-" * 60)
@@ -2310,18 +2161,30 @@ def find_best_dps_profile(profiles, line_type, team_config):
         print("-" * 60)
 
         if "odette" in members:
-            print(f"On-Field Stellar Damage:  {odette_on_field_stellar:,.2f}")
-            print(f"Off-Field Stellar Damage: {odette_off_field_stellar:,.2f}")
+            print(f"On-Field Stellar Damage: {odette_on_field_stellar:,.2f}")
+            print(f"On-Field Cryo Damage:    {odette_on_field_cryo:,.2f}")
+            print(f"On-Field Total Damage:   {odette_on_field_total:,.2f}")
         else:
             print(f"On-Field Stellar Damage:  {0.0:,.2f}")
             print(f"Off-Field Stellar Damage: {0.0:,.2f}")
 
         print("-" * 60)
 
-        odette_rotation_damage = (
-            odette_on_field_stellar
-            + odette_off_field_stellar
-        )
+        # DEBUG: Artifact set assignments
+        artifact_buffs = best_vesna.active_team_artifact_set_distribution_and_buffs
+
+        print()
+        print("-" * 60)
+        print("DEBUG ARTIFACT SET ASSIGNMENTS")
+        print("-" * 60)
+
+        for set_name, details in artifact_buffs.items():
+            holder = details.get("holder")
+            print(f"{set_name}: {holder if holder is not None else 'no holder'}")
+
+        print("-" * 60)
+
+        odette_rotation_damage = (odette_on_field_total+ odette_off_field_stellar + best_vesna.vortex_procs * best_vesna.calculate_odette_vortex_proc_damage(level=90) + best_vesna.vortex_explosions * best_vesna.calculate_odette_vortex_explosion_damage(level=90))
         odette_dps = odette_rotation_damage / rotation_time
         lumine_dps = lumine_rotation_damage / rotation_time
 
@@ -2354,17 +2217,26 @@ def find_best_dps_profile(profiles, line_type, team_config):
         print(f"Rotation Duration:          {rotation_time:.2f} s")
         print(f"Vesna Rotation Damage:      {vesna_rotation_damage:,.2f}")
         print(f"Vesna DPS:                  {vesna_dps:,.2f}")
-        print(f"Odette Stellar Damage:      {odette_rotation_damage:,.2f}")
+        print(f"Odette Total Damage:        {odette_rotation_damage:,.2f}")
         print(f"Odette DPS:                 {odette_dps:,.2f}")
-        print(f"Lumine Rotation Damage:     {lumine_rotation_damage:,.2f}")
-        print(f"Lumine DPS:                 {lumine_dps:,.2f}")
-        print(f"Diona DPS:                  {diona_dps_value:,.2f}")
-        print(f"Faruzan DPS:                {faruzan_dps_value:,.2f}")
-        print(f"Sucrose DPS:                {sucrose_dps_value:,.2f}")
-        print(f"Vodyanitsa DPS:             {vodyanitsa_flat_dps:,.2f}")
+        print()
         print("-" * 60)
-        print(f"Total Team Rotation Damage: {team_rotation_damage:,.2f}")
-        print(f"TOTAL TEAM DPS:             {team_dps:,.2f}")
+        print("LUMINE DAMAGE BREAKDOWN")
+        print("-" * 60)
+        print(f"Stellar Charge Attack Damage:   {lumine_stellar_charge_attack:,.2f}")
+        print(f"E-Skill Cryo Damage On-Field:   {lumine_e_skill_on_field:,.2f}")
+        print(f"E-Skill Cryo Damage Off-Field:  {lumine_e_skill_off_field:,.2f}")
+        print(f"Ultimate Q Stellar Damage:      {lumine_ultimate_q:,.2f}")
+        print("-" * 60)
+        print(f"Lumine Rotation Damage:         {lumine_rotation_damage if 'lumine' in members else 0.0:,.2f}")
+        print(f"Lumine DPS:                     {lumine_dps:,.2f}")
+        print(f"Diona DPS:                      {diona_dps_value:,.2f}")
+        print(f"Faruzan DPS:                    {faruzan_dps_value:,.2f}")
+        print(f"Sucrose DPS:                    {sucrose_dps_value:,.2f}")
+        print(f"Vodyanitsa DPS:                 {vodyanitsa_flat_dps:,.2f}")
+        print("-" * 60)
+        print(f"Total Team Rotation Damage:     {team_rotation_damage:,.2f}")
+        print(f"TOTAL TEAM DPS:                 {team_dps:,.2f}")
         print("=" * 60)
 
     return best_profile, best_dps
