@@ -243,12 +243,13 @@ class VesnaTeamDPSTheory:
         else:
             noblesse_holder = None
 
-        # Lumine 2pc/2pc ATK: Vodyanitsa + Lumine, without Diona
+        # Lumine 2pc/2pc ATK: only if Lumine does not already hold Noblesse
         atk_2p2p_holder = (
             "lumine"
             if self.is_vodyanitsa_active
             and self.is_lumine_active
             and not self.is_diona_active
+            and noblesse_holder != "lumine"
             else None
         )
 
@@ -1614,16 +1615,38 @@ class VesnaDPSTheoryExport:
         # Configurations
         # ----------------------------------------------------
 
+
         ws = wb.active
         ws.title = "Configurations"
 
-        headers = list(asdict(results[0]).keys())
+        profile_names = [
+            "profile_atk",
+            "profile_atk_percent",
+            "profile_cd_percent",
+            "profile_em",
+            "profile_cr_percent",
+            "profile_er_percent",
+        ]
+
+        artifact_names = [
+            f"artifact_{key}"
+            for key in results[0].artifact_sets.keys()
+        ]
+
+        headers = [
+            key
+            for key in asdict(results[0]).keys()
+            if key not in ("artifact_sets", "best_profile")
+        ]
+
+        headers.extend(artifact_names)
+        headers.extend(profile_names)
+
         ws.append(headers)
 
         for result in results:
             row = asdict(result)
 
-            # Store artifact assignments as separate columns.
             artifact_sets = row.pop("artifact_sets")
             best_profile = row.pop("best_profile")
 
@@ -1632,21 +1655,13 @@ class VesnaDPSTheoryExport:
                 for key, value in artifact_sets.items()
             })
 
-            profile_names = [
-                "profile_atk",
-                "profile_atk_percent",
-                "profile_cd_percent",
-                "profile_em",
-                "profile_cr_percent",
-                "profile_er_percent",
-            ]
-
             row.update(dict(zip(profile_names, best_profile)))
 
             ws.append([
                 row.get(header)
                 for header in headers
             ])
+
 
         # ----------------------------------------------------
         # Ranking
@@ -2453,7 +2468,6 @@ if __name__ == "__main__":
     log_file = log_path.open("w", encoding="utf-8")
 
     sys.stdout = Tee(sys.stdout, log_file)
-    atexit.register(log_file.close)
 
     calculator = VesnaTeamDPSTheory()
     line_type = "3_line"
@@ -2486,4 +2500,5 @@ if __name__ == "__main__":
     )
 
     print("\nExcel export completed.")
-
+    sys.stdout = sys.__stdout__
+    log_file.close()
