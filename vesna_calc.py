@@ -1090,9 +1090,13 @@ class VesnaTeamDPSTheory:
 
     @property
     def lumine_crit_multiplier(self) -> float:
-        crit_damage = (self.lumine_total_CD + self.vodyanitsa_C2_stellar_reaction_cd_bonus)
+        crit_damage = self.lumine_total_CD
 
-        return 1.0 + (self.lumine_effective_cr / 100.0) * (crit_damage / 100.0)
+        return (
+            1.0
+            + (self.lumine_effective_cr / 100.0)
+            * (crit_damage / 100.0)
+        )
 
     @property
     def lumine_total_atk(self) -> float:
@@ -1125,7 +1129,7 @@ class VesnaTeamDPSTheory:
         return (self.lumine_total_atk + self.lumine_base_atk_total * self.lumine_atk_percent_value)
 
     #7.1.1 Lumine Damage calcs for E CA Q
-    #Damage Calc for Stellar CA
+    # Damage Calc for Stellar CA
     @property
     def lumine_stellar_charge_attack_damage(self) -> float:
         damage = (
@@ -1136,7 +1140,7 @@ class VesnaTeamDPSTheory:
 
         return (
             damage
-            * self.lumine_crit_multiplier
+            * self.calculate_stellar_crit_multiplier("lumine", "cryo")
             * self.calculate_cryo_res_multiplier
         )
     #Damage Calc for E-Skill
@@ -1167,7 +1171,7 @@ class VesnaTeamDPSTheory:
             * self.calculate_cryo_res_multiplier
         )
 
-    #Damage Calc for Stellar Q
+    # Damage Calc for Stellar Q
     @property
     def lumine_ultimate_q_stellar_damage(self) -> float:
         total_mv = (
@@ -1189,7 +1193,7 @@ class VesnaTeamDPSTheory:
 
         return (
             damage
-            * self.lumine_crit_multiplier
+            * self.calculate_stellar_crit_multiplier("lumine", "cryo")
             * self.calculate_cryo_res_multiplier
         )
     @property
