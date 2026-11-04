@@ -204,7 +204,6 @@ class VesnaTeamDPSTheory:
         """Dynamically assigns artifact sets and returns their effects and conditions."""
 
         buffs = {}
-
         # --------------------------------------------------
         # 1. Determine artifact set holders
         # --------------------------------------------------
@@ -242,6 +241,9 @@ class VesnaTeamDPSTheory:
             noblesse_holder = "lumine"
         else:
             noblesse_holder = None
+
+        # Tsaritsa-Set holder
+        tsaritsa_holder = "anastasya" if self.is_anastasya_active else None
 
         # Lumine 2pc/2pc ATK: only if Lumine does not already hold Noblesse
         atk_2p2p_holder = (
@@ -343,37 +345,69 @@ class VesnaTeamDPSTheory:
                 "odette_and_vesna_uptime_80_percent": instructor_holder is not None,
             },
         }
-
+        # --------------------------------------------------
+        # 8. Tsaritsa set
+        # --------------------------------------------------
+        buffs["tsaritsa"] = {
+            "holder": tsaritsa_holder,
+            "atk_bonus": 18.0,
+            "crit_rate_bonus": 20.0,
+            "stellar_crit_rate_bonus": 40.0,
+            "uptime": 1.0 if self.is_anastasya_active else 0.0,
+            "conditions": {
+                "all_characters": False,
+                "all_damage_types": False,
+            },
+        }
         return buffs
-
-    #Team wide ATK% form talents, weapons, cons or artifact sets
+    #Team Rotation length
     @property
-    def team_atk_percent_artifact_and_other_bonus(self) -> float:
-        """Returns the combined team-wide ATK% bonuses."""
-
+    def rotation_duration(self) -> float:
+        return 22.5 if self.is_anastasya_active else 19.5
+    # Common flat atk bonus from party
+    @property
+    def team_flat_atk_common_bonus(self) -> float:
+        return (
+            self.vodyanitsa_C1_flat_atk_bonus
+            if self.is_vodyanitsa_active and self.vodyanitsa_constellation >= 1
+            else 0.0
+        )
+    #Team wide ATK% form talents, weapons, cons or artifact sets
+    def team_atk_percent_common_bonus(self, character: str) -> float:
         buff = 0.0
-        # Vesna: A3 talent
-        if self.is_vodyanitsa_active:
-            buff += self.atk_percent_vesna_a3_talent_cryo_anemo_trio
-        else:
-            buff += self.atk_percent_vesna_a3_talent_cryo_anemo_quartett
-        # Odette: Marvelous Splendor C2
-        if (self.is_odette_active and self.odette_constellation >= 2):
-            buff += self.odette_C2_marvelous_splender_stacks_atk_percent * 6
 
         # Tenacity of the Millelith
         if self.active_team_artifact_set_distribution_and_buffs["tom"]["holder"] is not None:
             buff += 20.0
 
+        # Odette: Marvelous Splendor C2
+        if self.is_odette_active and self.odette_constellation >= 2:
+            if character != "odette":
+                buff += (self.odette_C2_marvelous_splender_stacks_atk_percent * self.odette_marvelous_splender_stacks)
+
+        return buff / 100.0
+
+    # Team-wide ATK% bonus from variable buffs
+    def team_atk_percent_variable_bonus(self, character: str, on_field: bool) -> float:
+        buff = 0.0
+
         # Noblesse Oblige
         if self.active_team_artifact_set_distribution_and_buffs["noblesse"]["holder"] is not None:
-            buff += 20.0
-
+            if character == "vesna":
+                buff += 20.0
+            elif not on_field:
+                buff += 20.0 * (12.0 / self.rotation_duration)
         # Vodyanitsa: Signature Weapon
-        if self.is_vodyanitsa_active:
+        if self.is_vodyanitsa_active and on_field:
             buff += self.vodyanitsa_signature_atk_bonus
 
-        return buff /100.0
+        # Anastasya: C1 ATK bonus for Cryo characters
+        if self.is_anastasya_active and self.anastasya_constellation >= 1:
+            if character in ("odette", "lumine", "diona"):
+                buff += self.anastasya_C1_cryo_character_atk_buff
+
+        return buff / 100.0
+
     #General Teamwide EM buffs applied to specific Characters
     def team_em_buff(self, character: str) -> float:
         buff = 0.0
@@ -408,6 +442,10 @@ class VesnaTeamDPSTheory:
                 )
 
                 buff += vesna_sucrose_buff * 0.75
+        # Anastasya C1 EM buff for non-Cryo characters
+        if self.is_anastasya_active and self.anastasya_constellation >= 1:
+            if character not in ("odette", "lumine", "diona", "anastasya"):
+                buff += 60.0
 
         return buff
 
@@ -423,12 +461,14 @@ class VesnaTeamDPSTheory:
             buff += self.odette_furnace_set_stellar_damage_bonus
 
         # Faruzan: Breezeborne R5
-        if self.is_faruzan_active:
+        if self.is_faruzan_active or self.is_diona_active or self.is_anastasya_active:
             buff += self.faruzan_breezeborne_r5_stellar_damage_bonus
 
         # Lumine: Stellar Jubilee
         if self.is_lumine_active:
             buff += 40.0
+        if self.is_anastasya_active:
+            buff += 50.0
 
         return buff / 100.0
     #General Stellar Anemo Crit damage
@@ -468,14 +508,26 @@ class VesnaTeamDPSTheory:
 
         elif element != "cryo":
             raise ValueError(f"Unsupported Stellar element: {element}")
+        # 4. Anastasya: Team-wide Stellar Crit-DMG bonus
+        if self.is_anastasya_active:
+            crit_damage += (
+                12.0 * (3.0 / self.rotation_duration)
+                + 4.0 * ((self.rotation_duration - 3.0) / self.rotation_duration)
+            )
 
-        return 1.0 + crit_damage / 100.0
+        # 5. Anastasya C2: Stellar Crit-DMG
+        if character == "anastasya" and self.is_anastasya_active and self.anastasya_constellation >= 2:
+            crit_damage += self.anastasya_C2_stellar_CD_mod
+
+        multiplier = 1.0 + crit_damage / 100.0
+
+        # 6. Anastasya C2: Stellar Elevation
+        if self.is_anastasya_active and self.anastasya_constellation >= 2:
+            multiplier *= self.anastasya_C2_stellar_elevation_mod
+
+        return multiplier
     # General EMM Multiplier for Vesna, Odette, Lumine, Anastasya
-    def calculate_stellar_damage_multiplier(
-        self,
-        character: str,
-        on_field: bool = True
-    ) -> float:
+    def calculate_stellar_damage_multiplier(self, character: str, on_field: bool = True) -> float:
 
         # 1. Determine character-specific Elemental Mastery
         if character == "vesna":
@@ -494,7 +546,7 @@ class VesnaTeamDPSTheory:
             personal_stellar_bonus = 0.0
 
         elif character == "anastasya":
-            elemental_mastery = self.lumine_base_em_value
+            elemental_mastery = self.anastasya_total_em
             personal_stellar_bonus = 0.0
 
         else:
@@ -520,13 +572,17 @@ class VesnaTeamDPSTheory:
                     stacks * self.odette_C0_stellar_damage / 100.0
                 )
 
-        # 3. Calculate talent-based Stellar damage bonuses
+        # 3. Calculate talent-based Stellar damage bonuses (14% Vesna, Odette, Anastasya, 7% Lumine)
         talent_stellar_bonus = (
             (self.odette_talent_stellar_damage_bonus if self.is_odette_active else 0.0)
             + self.vesna_talent_stellar_base_damage_bonus
             + (
                 self.lumine_stellar_jubilee_talent_stellar_base_damage_mod
                 if self.is_lumine_active else 0.0
+            )
+            + (
+                self.anastasya_talent_stellar_base_damage_mod
+                if self.is_anastasya_active else 0.0
             )
         ) / 100.0
         # 4. Calculate final Stellar damage multiplier
@@ -606,12 +662,12 @@ class VesnaTeamDPSTheory:
 
     @property
     def vodyanitsa_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "vodyanitsa", 0
-            )
-        )
+        return int(self.current_configuration.get("constellations", {}).get("vodyanitsa", 0))
     
+    @property
+    def anastasya_constellation(self) -> int:
+        return int(self.current_configuration.get("constellations", {}).get("anastasya", 0))
+
     @property
     def active_team_members(self) -> list[str]:
         return self.active_team["members"]
@@ -707,7 +763,6 @@ class VesnaTeamDPSTheory:
     vesna_C2_atk_value: float = 40
 
 
-
     # 3. ODETTE STATS
     # We are simulating Odette in all of her teams on Furnace set
     # Character stats
@@ -744,16 +799,13 @@ class VesnaTeamDPSTheory:
     odette_plume_stellar_hits: int = 5
     odette_wing_stellar_hits: int = 5
 
-
     # Stellar-Damage Mods
     odette_C0_stellar_damage: float = 15.0
     odette_personal_stellar_damage_bonus: float = 30.0
     odette_talent_stellar_damage_bonus: float = 14.0
 
-
     # Marvelous Splendor – Stacks
     odette_marvelous_splender_stacks: float = 4.0
-
 
     # Constellations
     # C1
@@ -768,7 +820,7 @@ class VesnaTeamDPSTheory:
 
     @property
     def odette_atk_percent_value(self) -> float:
-        return self.team_atk_percent_artifact_and_other_bonus
+        return self.team_atk_percent_common_bonus("vesna") + self.team_atk_percent_variable_bonus("vesna", True)
     @property
     def odette_on_field_atk(self) -> float:
         vodyanitsa_c1_bonus = (
@@ -836,6 +888,7 @@ class VesnaTeamDPSTheory:
         damage += self.active_vodyanitsa_stellar_quills_flat_damage
 
         return (damage* self.odette_crit_multiplier* self.calculate_cryo_res_multiplier)
+
     # Odette - On-Field Cryo Damage
     @property
     def odette_on_field_cryo_damage(self) -> float:
@@ -1010,7 +1063,7 @@ class VesnaTeamDPSTheory:
     faruzan_VV_set_cryo_res_reduction: float = 40.0
 
     faruzan_breezeborne_r1_stellar_damage_bonus: float = 24.0
-    faruzan_breezeborne_r5_stellar_damage_bonus: float = 24.0 # auf r1
+    faruzan_breezeborne_r5_stellar_damage_bonus: float = 48.0 # auf r1
 
 
     # 7. SUCROSE – C6
@@ -1121,7 +1174,7 @@ class VesnaTeamDPSTheory:
 
     @property
     def lumine_atk_percent_value(self) -> float:
-        return self.team_atk_percent_artifact_and_other_bonus
+        return self.team_atk_percent_common_bonus("vesna") + self.team_atk_percent_variable_bonus("vesna", True)
 
 
     @property
@@ -1206,11 +1259,248 @@ class VesnaTeamDPSTheory:
             + self.lumine_ultimate_q_stellar_damage
         )
 
-    @property
-    def lumine_rotation_dps(self) -> float:
-        """Average DPS of Lumine over a 19.5-second rotation."""
-        return self.lumine_rotation_damage / 19.5
+    # Anastasaya Stats
+    # Signature Weappon
+    # Stats distribution rolls [ATK,ATK%,EM,CR%,CD%,ER%] [4,5,5,12,12,2]
+    # ER on weapon reduces req ER rolls by 2
+    # we can say she is holidng her sig or breezeborne
+    # We are assuming Anastasya has CD Ascension
+    #Artifact Substat distribution profile:
 
+    #Anastasya's  Stats
+    anastasya_rotation_length: float = 20.5
+    anastasya_base_atk: float = 350 #assumed, we dont know yet
+    anastasya_base_atk_sig_base_atk: float = 674
+    anastasya_base_atk_total: float = 1024
+    anastasya_sig_CD_value: float = 44.1
+    anastasya_sig_stellar_CD_value: float = 40.0
+    anastasya_sig_atk_value: float = 40.0
+    anastasya_base_em_value: float = 0.0
+    anstasya_CD_ascension_value: float = 38.4
+
+    # Tsaritsa Artifact Set
+    tsaritsa_atk_bonus: float = 18.0
+    tsaritsa_cryo_cr_bonus: float = 20.0
+    tsaritsa_stellar_cr_bonus: float = 40.0
+
+    
+    #Anastasya's Stats from artifacts
+    anastasya_feather_flat_atk_bonus: float = 311
+    anastasya_artifact_sands_atk_value:float = 46.6
+    anastasya_artifact_goblet_atk_value:float = 46.6
+    anastasya_artifact_circlet_CD_value:float = 62.2
+
+    anastasya_total_em: float = 5*ARTIFACT_SUBSTATS["EM"]["average"]
+    anastasya_total_CD: float = 10*ARTIFACT_SUBSTATS["CD%"]["average"] + anastasya_artifact_circlet_CD_value + anstasya_CD_ascension_value + anastasya_sig_CD_value
+
+    # Anastasya's Team buffs from Kit 
+    anastasya_talent_glory_team_CD_buff: float = 12  #20sec uptime 100%
+    anastasya_talent_glory_stacks_team_CD_buff: float = 4 #
+    anastasya_talent_stellar_damage_mod: float = 50 #from Q 100% uptime 
+    anastasya_talent_stellar_base_damage_mod: float = 14   
+
+
+    # Anastasya MV (Support Style)
+    # E-Skill
+    anastasya_mv_Tap_E_Skill_On_field_inital_mv_value: float = 212.76 #cryo damage 118.2 lv1 10
+    anastasya_mv_Tap_E_Skill_off_field_cryo_periodic_mv_value: float = 1152 #cryo damage 35.6 lv1 1 // 64.0 lv 10
+    anastasya_mv_Tap_E_Skill_off_field_stellar_periodic_mv_value: float = 1080 #stellar damage 33.3 lv1 // 60.0 lv 10
+
+    # Q-Ultimate
+    anastasya_to_a_new_world_inital_cryo_Q_mv_value: float = 360.7 #cryo damage happens before she leaves the field
+    anastasya_to_a_new_world_stellar_Q_mv_value: float = 601.2 #stellar damage happens on re entering the field
+    anastasya_mv_off_field_stellar_periodic_mv_value_after_Q: float = 543.6 #stellar damage
+    
+    #C1
+    anastasya_C1_cryo_character_atk_buff: float = 15.0
+    anastasya_C1_not_cryo_character_em_buff: float = 60
+    anastasya_C1_glory_team_CD_buff_multi: float = 3
+    #C2
+    anastasya_C2_stellar_elevation_mod: float = 1.05 #evelation is multiplied next to res multiplier at the end
+    anastasya_C2_stellar_CD_mod: float = 60 #100% uptime
+
+    @property
+    def anastasya_effective_cr(self) -> float:
+        cr = (5.0+ 12 * ARTIFACT_SUBSTATS["CR%"]["average"])
+
+        # Apply team CR bonus
+        if self.is_odette_active or self.is_diona_active or self.is_lumine_active:
+            cr += 15.0
+
+        # Apply Tsaritsa set CR bonus for cryo damage
+        if self.active_team_artifact_set_distribution_and_buffs["tsaritsa"]["holder"] == "anastasya":
+            cr += 20.0
+
+        return min(cr, 100.0)
+    @property
+    def anastasya_effective_stellar_cr(self) -> float:
+        cr = self.anastasya_effective_cr
+
+        # Tsaritsa 4-piece CR bonus for Stellar Glimmer damage
+        if self.active_team_artifact_set_distribution_and_buffs["tsaritsa"]["holder"] == "anastasya":
+            cr += 40.0
+
+        return min(cr, 100.0)
+    @property
+    def anastasya_cryo_crit_multiplier(self) -> float:
+        crit_damage = self.anastasya_total_CD
+
+        return (
+            1.0
+            + (self.anastasya_effective_cr / 100.0)
+            * (crit_damage / 100.0)
+        )
+
+    @property
+    def anastasya_stellar_crit_multiplier(self) -> float:
+        crit_damage = self.anastasya_total_CD
+        stellar_cr = self.anastasya_effective_stellar_cr
+
+        return (
+            1.0
+            + (stellar_cr / 100.0)
+            * (crit_damage / 100.0)
+        )
+
+    @property
+    def anastasya_total_atk(self) -> float:
+        vodyanitsa_c1_bonus = (self.vodyanitsa_C1_flat_atk_bonus if self.is_vodyanitsa_active and self.vodyanitsa_constellation >= 1 else 0.0)
+        tsaritsa_atk_bonus = (self.active_team_artifact_set_distribution_and_buffs["tsaritsa"]["atk_bonus"]if self.active_team_artifact_set_distribution_and_buffs["tsaritsa"]["holder"] == "anastasya"else 0.0)
+
+        return (
+            self.anastasya_base_atk_total
+            * (
+                1.0
+                + (
+                    self.anastasya_sig_atk_value
+                    + self.anastasya_artifact_sands_atk_value
+                    + self.anastasya_artifact_goblet_atk_value
+                    + tsaritsa_atk_bonus
+                ) / 100.0
+            )
+            + self.anastasya_feather_flat_atk_bonus
+            + vodyanitsa_c1_bonus
+        )
+
+    @property
+    def anastasya_atk_percent_value(self) -> float:
+        return (
+            self.team_atk_percent_common_bonus("anastasya")
+            + self.team_atk_percent_variable_bonus("anastasya", True)
+        )
+
+    @property
+    def anastasya_on_field_atk(self) -> float:
+        return (self.anastasya_total_atk + self.anastasya_base_atk_total * self.anastasya_atk_percent_value)
+    @property
+    def anastasya_off_field_atk(self) -> float:
+        return (
+            self.anastasya_total_atk
+            + self.anastasya_base_atk_total
+            * (
+                self.team_atk_percent_common_bonus("anastasya")
+                + self.team_atk_percent_variable_bonus("anastasya", False)
+            )
+        )
+    # Anastasya Stellar Damage Calc
+    def calculate_anastasya_stellar_damage(self, mv: float,atk: float,on_field: bool = True) -> float:
+        damage = (
+            atk
+            * (mv / 100.0)
+            * self.calculate_stellar_damage_multiplier(
+                "anastasya",
+                on_field=on_field,
+            )
+        )
+
+        # Add Vodyanitsa Stellar Quills flat damage
+        if not (self.is_odette_active and self.is_vodyanitsa_active):
+            damage += self.active_vodyanitsa_stellar_quills_flat_damage
+
+        return (
+            damage
+            * self.anastasya_stellar_crit_multiplier
+            * self.calculate_cryo_res_multiplier
+        )
+
+    #Damage Calc for E-Skill
+    @property
+    def anastasya_e_skill_cryo_damage_on_field(self) -> float:
+        damage = (
+            self.anastasya_on_field_atk
+            * (self.anastasya_mv_Tap_E_Skill_On_field_inital_mv_value / 100.0)
+        )
+
+        return (
+            damage
+            * self.anastasya_cryo_crit_multiplier
+            * self.general_defense_multiplier_90
+            * self.calculate_cryo_res_multiplier
+        )
+
+    #Damage Calc for E-Skill off-field
+    @property
+    def anastasya_e_skill_cryo_damage_off_field(self) -> float:
+        damage_per_tick = self.anastasya_off_field_atk * (self.anastasya_mv_Tap_E_Skill_off_field_cryo_periodic_mv_value / 100.0)
+
+        return (
+            damage_per_tick
+            * self.anastasya_cryo_crit_multiplier
+            * self.general_defense_multiplier_90
+            * self.calculate_cryo_res_multiplier
+        )
+
+    # Damage Calc for E-Skill off-field Stellar
+    @property
+    def anastasya_e_skill_stellar_damage_off_field(self) -> float:
+        return self.calculate_anastasya_stellar_damage(
+            mv=self.anastasya_mv_Tap_E_Skill_off_field_stellar_periodic_mv_value,
+            atk=self.anastasya_off_field_atk,
+            on_field=False,
+        )
+    # Damage Calc for Cryo Q
+    @property
+    def anastasya_ultimate_q_cryo_damage_on_field(self) -> float:
+        damage = (
+            self.anastasya_on_field_atk
+            * (self.anastasya_to_a_new_world_inital_cryo_Q_mv_value / 100.0)
+        )
+
+        return (
+            damage
+            * self.anastasya_cryo_crit_multiplier
+            * self.general_defense_multiplier_90
+            * self.calculate_cryo_res_multiplier
+        )
+    # Damage Calc for Stellar Q
+    @property
+    def anastasya_ultimate_q_stellar_damage(self) -> float:
+        total_mv = (self.anastasya_to_a_new_world_stellar_Q_mv_value)
+
+        return self.calculate_anastasya_stellar_damage(
+            mv=total_mv,
+            atk=self.anastasya_on_field_atk,
+            on_field=True,
+        )
+    # Damage Calc for Stellar Q Off-Field Tick
+    @property
+    def anastasya_ultimate_q_stellar_damage_off_field_tick_damage(self) -> float:
+        return self.calculate_anastasya_stellar_damage(
+            mv=self.anastasya_mv_off_field_stellar_periodic_mv_value_after_Q,
+            atk=self.anastasya_off_field_atk,
+            on_field=False,
+        )
+    @property
+    def anastasya_rotation_damage(self) -> float:
+        """Total damage dealt by Anastasya during one rotation."""
+        return (
+            + self.anastasya_e_skill_cryo_damage_on_field
+            + self.anastasya_e_skill_cryo_damage_off_field
+            + self.anastasya_e_skill_stellar_damage_off_field
+            + self.anastasya_ultimate_q_stellar_damage
+            + self.anastasya_ultimate_q_stellar_damage_off_field_tick_damage
+            + self.anastasya_ultimate_q_cryo_damage_on_field
+        )
 
     # 8. VESNA – STATS AND DAMAGE MULTIPLIERS
     @property
@@ -1220,7 +1510,8 @@ class VesnaTeamDPSTheory:
             + self.atk_percent_goblet
             + self.atk_percent_set_bonus
             + self.atk_percent
-        ) / 100.0 + self.team_atk_percent_artifact_and_other_bonus
+            + (self.atk_percent_vesna_a3_talent_cryo_anemo_trio if self.is_vodyanitsa_active else self.atk_percent_vesna_a3_talent_cryo_anemo_quartett)
+        ) / 100.0 + self.team_atk_percent_common_bonus("vesna") + self.team_atk_percent_variable_bonus("vesna", True)
 
     @property
     def vesna_base_atk_value(self) -> float:
@@ -1465,65 +1756,110 @@ class VesnaTeamDPSTheory:
 
     # 8. Team Comps and definitions
     TEAMS: ClassVar[list[dict]] = [
-        {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
-         "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
+        # {"name": "Vesna_Odette_Vodyanitsa_Faruzan",
+        #  "members": ["vesna", "odette", "vodyanitsa", "faruzan"]},
 
-        {"name": "Vesna_Odette_Vodyanitsa_Diona",
-         "members": ["vesna", "odette", "vodyanitsa", "diona"]},
+        # {"name": "Vesna_Odette_Vodyanitsa_Diona",
+        #  "members": ["vesna", "odette", "vodyanitsa", "diona"]},
 
-        {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
-         "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
+        # {"name": "Vesna_Odette_Vodyanitsa_Sucrose",
+        #  "members": ["vesna", "odette", "vodyanitsa", "sucrose"]},
 
-        {"name": "Vesna_Odette_Faruzan_Diona",
-         "members": ["vesna", "odette", "faruzan", "diona"]},
+        # {"name": "Vesna_Odette_Faruzan_Diona",
+        #  "members": ["vesna", "odette", "faruzan", "diona"]},
 
-        {"name": "Vesna_Odette_Faruzan_Sucrose",
-         "members": ["vesna", "odette", "faruzan", "sucrose"]},
+        # {"name": "Vesna_Odette_Faruzan_Sucrose",
+        #  "members": ["vesna", "odette", "faruzan", "sucrose"]},
 
-        {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
-         "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
+        # {"name": "Vesna_Vodyanitsa_Faruzan_Diona",
+        #  "members": ["vesna", "vodyanitsa", "faruzan", "diona"]},
 
-        {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
-         "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
+        # {"name": "Vesna_Vodyanitsa_Faruzan_Sucrose",
+        #  "members": ["vesna", "vodyanitsa", "faruzan", "sucrose"]},
 
-        {"name": "Vesna_Odette_Diona_Sucrose",
-         "members": ["vesna", "odette", "diona", "sucrose"]},
+        # {"name": "Vesna_Odette_Diona_Sucrose",
+        #  "members": ["vesna", "odette", "diona", "sucrose"]},
 
-        {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
-         "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
+        # {"name": "Vesna_Vodyanitsa_Diona_Sucrose",
+        #  "members": ["vesna", "vodyanitsa", "diona", "sucrose"]},
 
-        {"name": "Vesna_Faruzan_Diona_Sucrose",
-         "members": ["vesna", "faruzan", "diona", "sucrose"]},
+        # {"name": "Vesna_Faruzan_Diona_Sucrose",
+        #  "members": ["vesna", "faruzan", "diona", "sucrose"]},
 
-        {"name": "Vesna_Odette_Vodyanitsa_Lumine",
-         "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
+        # {"name": "Vesna_Odette_Vodyanitsa_Lumine",
+        #  "members": ["vesna", "odette", "vodyanitsa", "lumine"]},
 
-        {"name": "Vesna_Odette_Faruzan_Lumine",
-         "members": ["vesna", "odette", "faruzan", "lumine"]},
+        # {"name": "Vesna_Odette_Faruzan_Lumine",
+        #  "members": ["vesna", "odette", "faruzan", "lumine"]},
 
-        {"name": "Vesna_Odette_Diona_Lumine",
-         "members": ["vesna", "odette", "diona", "lumine"]},
+        # {"name": "Vesna_Odette_Diona_Lumine",
+        #  "members": ["vesna", "odette", "diona", "lumine"]},
 
-        {"name": "Vesna_Odette_Sucrose_Lumine",
-         "members": ["vesna", "odette", "sucrose", "lumine"]},
+        # {"name": "Vesna_Odette_Sucrose_Lumine",
+        #  "members": ["vesna", "odette", "sucrose", "lumine"]},
 
-        {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
-         "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
+        # {"name": "Vesna_Vodyanitsa_Faruzan_Lumine",
+        #  "members": ["vesna", "vodyanitsa", "faruzan", "lumine"]},
 
-        {"name": "Vesna_Vodyanitsa_Diona_Lumine",
-         "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
+        # {"name": "Vesna_Vodyanitsa_Diona_Lumine",
+        #  "members": ["vesna", "vodyanitsa", "diona", "lumine"]},
 
-        {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
-         "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
+        # {"name": "Vesna_Vodyanitsa_Sucrose_Lumine",
+        #  "members": ["vesna", "vodyanitsa", "sucrose", "lumine"]},
 
-        {"name": "Vesna_Faruzan_Diona_Lumine",
-         "members": ["vesna", "faruzan", "diona", "lumine"]},
+        # {"name": "Vesna_Faruzan_Diona_Lumine",
+        #  "members": ["vesna", "faruzan", "diona", "lumine"]},
 
-        {"name": "Vesna_Faruzan_Sucrose_Lumine",
-         "members": ["vesna", "faruzan", "sucrose", "lumine"]},
+        # {"name": "Vesna_Faruzan_Sucrose_Lumine",
+        #  "members": ["vesna", "faruzan", "sucrose", "lumine"]},
 
-        {"name": "Vesna_Diona_Sucrose_Lumine",
-         "members": ["vesna", "diona", "sucrose", "lumine"]},
+        # {"name": "Vesna_Diona_Sucrose_Lumine",
+        #  "members": ["vesna", "diona", "sucrose", "lumine"]},
+        # Anastasya Teams
+        {"name": "Vesna_Anastasya_Odette_Vodyanitsa",
+        "members": ["vesna", "anastasya", "odette", "vodyanitsa"]},
+
+        {"name": "Vesna_Anastasya_Odette_Faruzan",
+        "members": ["vesna", "anastasya", "odette", "faruzan"]},
+
+        {"name": "Vesna_Anastasya_Odette_Diona",
+        "members": ["vesna", "anastasya", "odette", "diona"]},
+
+        {"name": "Vesna_Anastasya_Odette_Sucrose",
+        "members": ["vesna", "anastasya", "odette", "sucrose"]},
+
+        {"name": "Vesna_Anastasya_Odette_Lumine",
+        "members": ["vesna", "anastasya", "odette", "lumine"]},
+
+        {"name": "Vesna_Anastasya_Vodyanitsa_Faruzan",
+        "members": ["vesna", "anastasya", "vodyanitsa", "faruzan"]},
+
+        {"name": "Vesna_Anastasya_Vodyanitsa_Diona",
+        "members": ["vesna", "anastasya", "vodyanitsa", "diona"]},
+
+        {"name": "Vesna_Anastasya_Vodyanitsa_Sucrose",
+        "members": ["vesna", "anastasya", "vodyanitsa", "sucrose"]},
+
+        {"name": "Vesna_Anastasya_Vodyanitsa_Lumine",
+        "members": ["vesna", "anastasya", "vodyanitsa", "lumine"]},
+
+        {"name": "Vesna_Anastasya_Faruzan_Diona",
+        "members": ["vesna", "anastasya", "faruzan", "diona"]},
+
+        {"name": "Vesna_Anastasya_Faruzan_Sucrose",
+        "members": ["vesna", "anastasya", "faruzan", "sucrose"]},
+
+        {"name": "Vesna_Anastasya_Faruzan_Lumine",
+        "members": ["vesna", "anastasya", "faruzan", "lumine"]},
+
+        {"name": "Vesna_Anastasya_Diona_Sucrose",
+        "members": ["vesna", "anastasya", "diona", "sucrose"]},
+
+        {"name": "Vesna_Anastasya_Diona_Lumine",
+        "members": ["vesna", "anastasya", "diona", "lumine"]},
+
+        {"name": "Vesna_Anastasya_Sucrose_Lumine",
+        "members": ["vesna", "anastasya", "sucrose", "lumine"]},
     ]
     VESNA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
     ODETTE_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
@@ -1582,6 +1918,7 @@ class VesnaDPSTheoryExport:
     vesna_constellation: int
     odette_constellation: int
     vodyanitsa_constellation: int
+    anastasya_constellation: int
 
     artifact_sets: dict[str, str | None]
 
@@ -1624,12 +1961,12 @@ class VesnaDPSTheoryExport:
         ws.title = "Configurations"
 
         profile_names = [
-            "profile_atk",
-            "profile_atk_percent",
-            "profile_cd_percent",
-            "profile_em",
-            "profile_cr_percent",
-            "profile_er_percent",
+            "profile_flat_atk_rolls",
+            "profile_atk_percent_rolls",
+            "profile_cd_percent_rolls",
+            "profile_em_rolls",
+            "profile_cr_percent_rolls",
+            "profile_er_percent_rolls",
         ]
 
         artifact_names = [
@@ -2244,7 +2581,6 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
     """
     best_profile = None
     best_dps = float("-inf")
-    rotation_time = 19.5
 
     roll_averages = {
         stat: ARTIFACT_SUBSTATS[stat]["average"]
@@ -2276,7 +2612,7 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
             team_name=team_config["team_name"],
             current_configuration=team_config.copy(),
         )
-
+        rotation_time = vesna.rotation_duration
         total_damage = vesna.calculate_total_vesna_damage()
         dps = total_damage / rotation_time
 
@@ -2319,6 +2655,7 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
             team_name=team_config["team_name"],
             current_configuration=team_config.copy(),
         )
+        rotation_time = best_vesna.rotation_duration
         members = set(team_config["members"])
         # Vesna damage
         vesna_rotation_damage = (best_vesna.calculate_total_vesna_damage())
@@ -2349,6 +2686,24 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
 
         # Lumine - Cryo and Stellar damage
         lumine_rotation_damage = (lumine_stellar_charge_attack+ lumine_e_skill_on_field+ lumine_e_skill_off_field+ lumine_ultimate_q)
+        # Anastasya Damage Breakdown
+        anastasya_e_skill_cryo_damage_on_field = (best_vesna.anastasya_e_skill_cryo_damage_on_field if "anastasya" in members else 0.0)
+        anastasya_e_skill_cryo_damage_off_field = (best_vesna.anastasya_e_skill_cryo_damage_off_field if "anastasya" in members else 0.0)
+        anastasya_e_skill_stellar_damage_off_field = (best_vesna.anastasya_e_skill_stellar_damage_off_field if "anastasya" in members else 0.0)
+        anastasya_ultimate_q_stellar_damage = (best_vesna.anastasya_ultimate_q_stellar_damage if "anastasya" in members else 0.0)
+        anastasya_ultimate_q_stellar_damage_off_field_tick_damage = (best_vesna.anastasya_ultimate_q_stellar_damage_off_field_tick_damage if "anastasya" in members else 0.0)
+        anastasya_ultimate_q_cryo_damage_on_field =(best_vesna.anastasya_ultimate_q_cryo_damage_on_field if "anastasya" in members else 0.0)
+
+        anastasya_rotation_damage = (
+            anastasya_e_skill_cryo_damage_on_field
+            + anastasya_e_skill_cryo_damage_off_field
+            + anastasya_e_skill_stellar_damage_off_field
+            + anastasya_ultimate_q_stellar_damage
+            + anastasya_ultimate_q_stellar_damage_off_field_tick_damage
+            + anastasya_ultimate_q_cryo_damage_on_field
+        )
+
+        anastasya_dps = anastasya_rotation_damage / rotation_time
 
         # DEBUG: Artifact set assignments
         artifact_buffs = best_vesna.active_team_artifact_set_distribution_and_buffs
@@ -2368,6 +2723,7 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
         vesna_dps = vesna_dps if "vesna" in members else 0.0
         odette_dps = odette_dps if "odette" in members else 0.0
         lumine_dps = lumine_dps if "lumine" in members else 0.0
+        anastasya_dps = anastasya_dps if "anastasya" in members else 0.0
 
         team_dps = (
             vesna_dps
@@ -2377,6 +2733,7 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
             + sucrose_dps_value
             + vodyanitsa_flat_dps
             + lumine_dps
+            + anastasya_dps
         )
         team_rotation_damage = team_dps * rotation_time
     
@@ -2417,6 +2774,14 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
         print(f"Odette DPS:                 {odette_dps:,.2f}")
         print()
         print(f"Lumine DPS:                 {lumine_dps:,.2f}")
+        print(f"Anastasya Rotation Damage:       {anastasya_rotation_damage:,.2f}")
+        print(f"Anastasya E-Skill Cryo on-field: {anastasya_e_skill_cryo_damage_on_field:,.2f}")
+        print(f"Anastasya E-Skill Cryo off-field:{anastasya_e_skill_cryo_damage_off_field:,.2f}")
+        print(f"Anastasya E-Skill Stellar:       {anastasya_e_skill_stellar_damage_off_field:,.2f}")
+        print(f"Anastasya Q Cryo on-field:       {anastasya_ultimate_q_cryo_damage_on_field:,.2f}")
+        print(f"Anastasya Q Stellar:             {anastasya_ultimate_q_stellar_damage:,.2f}")
+        print(f"Anastasya Q off-field tick:      {anastasya_ultimate_q_stellar_damage_off_field_tick_damage:,.2f}")
+        print(f"Anastasya DPS:              {anastasya_dps:,.2f}")
         print(f"Diona DPS:                  {diona_dps_value:,.2f}")
         print(f"Faruzan DPS:                {faruzan_dps_value:,.2f}")
         print(f"Sucrose DPS:                {sucrose_dps_value:,.2f}")
@@ -2438,8 +2803,10 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
             line_type=line_type,
 
             vesna_constellation=int(constellations.get("vesna", 0)),
+            anastasya_constellation=int(constellations.get("anastasya", 0)),
             odette_constellation=int(constellations.get("odette", 0)),
             vodyanitsa_constellation=int(constellations.get("vodyanitsa", 0)),
+
 
             artifact_sets={
                 set_name: details.get("holder")
@@ -2500,7 +2867,7 @@ if __name__ == "__main__":
 
     VesnaDPSTheoryExport.export_to_excel(
         export_results,
-        output_path=Path(__file__).with_name("vesna_team_dps.xlsx"),
+        output_path=Path(__file__).with_name("vesna_team_with_anastasya_dps.xlsx"), #here change the name of the file
     )
 
     print("\nExcel export completed.")
