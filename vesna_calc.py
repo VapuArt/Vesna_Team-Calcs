@@ -237,6 +237,7 @@ class VesnaTeamDPSTheory:
             self.is_vodyanitsa_active
             and self.is_lumine_active
             and tom_holder != "lumine"
+            and furnace_holder != "lumine"
         ):
             noblesse_holder = "lumine"
         else:
@@ -646,19 +647,11 @@ class VesnaTeamDPSTheory:
 
     @property
     def vesna_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "vesna", 0
-            )
-        )
+        return int(self.current_configuration.get("constellations", {}).get("vesna", 0))
 
     @property
     def odette_constellation(self) -> int:
-        return int(
-            self.current_configuration.get("constellations", {}).get(
-                "odette", 0
-            )
-        )
+        return int(self.current_configuration.get("constellations", {}).get("odette", 0))
 
     @property
     def vodyanitsa_constellation(self) -> int:
@@ -1264,8 +1257,8 @@ class VesnaTeamDPSTheory:
     # Stats distribution rolls [ATK,ATK%,EM,CR%,CD%,ER%] [4,5,5,12,12,2]
     # ER on weapon reduces req ER rolls by 2
     # we can say she is holidng her sig or breezeborne
-    # We are assuming Anastasya has CD Ascension
-    #Artifact Substat distribution profile:
+    # I am assuming Anastasya has CD Ascension
+    # Artifact Substat distribution profile:
 
     #Anastasya's  Stats
     anastasya_rotation_length: float = 20.5
@@ -1864,6 +1857,7 @@ class VesnaTeamDPSTheory:
     VESNA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
     ODETTE_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
     VODYANITSA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
+    ANASTASYA_CONSTELLATIONS: ClassVar[list[float]] = [0.0, 1.0, 2.0]
 
     team_name: str = "Vesna_Odette_Vodyanitsa_Faruzan"
     current_configuration: dict = field(default_factory=dict)
@@ -1874,6 +1868,7 @@ class VesnaTeamDPSTheory:
         constellation_options = {
             "vesna": self.VESNA_CONSTELLATIONS,
             "odette": self.ODETTE_CONSTELLATIONS,
+            "anastasya": self.ANASTASYA_CONSTELLATIONS,
             "vodyanitsa": self.VODYANITSA_CONSTELLATIONS,
         }
 
@@ -1882,7 +1877,7 @@ class VesnaTeamDPSTheory:
 
             variable_members = [
                 member
-                for member in ("vesna", "odette", "vodyanitsa")
+                for member in ("vesna", "odette", "anastasya", "vodyanitsa")
                 if member in members
             ]
 
@@ -2719,11 +2714,17 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
         vodyanitsa_flat_dps = 750.0 if "vodyanitsa" in members else 0.0
 
 
-        # Total team damage
+        # Individual dps shown
         vesna_dps = vesna_dps if "vesna" in members else 0.0
         odette_dps = odette_dps if "odette" in members else 0.0
         lumine_dps = lumine_dps if "lumine" in members else 0.0
         anastasya_dps = anastasya_dps if "anastasya" in members else 0.0
+
+        # Individual damage shown
+        vesna_rotation_damage = vesna_rotation_damage if "vesna" in members else 0.0
+        odette_rotation_damage = odette_rotation_damage if "odette" in members else 0.0
+        lumine_rotation_damage = lumine_rotation_damage if "lumine" in members else 0.0
+        anastasya_rotation_damage = anastasya_rotation_damage if "anastasya" in members else 0.0
 
         team_dps = (
             vesna_dps
@@ -2746,6 +2747,7 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
         print("-" * 60)
         print(f"Vesna: C{int(constellations.get('vesna', 0))}")
         print(f"Odette: C{int(constellations.get('odette', 0))}")
+        print(f"Anastasya: C{int(constellations.get('anastasya', 0))}")
         print(f"Vodyanitsa: C{int(constellations.get('vodyanitsa', 0))}")
 
         print()
@@ -2770,18 +2772,15 @@ def find_best_dps_profile(profiles, line_type, team_config, configuration):
         print(f"Vesna Rotation Damage:      {vesna_rotation_damage:,.2f}")
         print(f"Vesna DPS:                  {vesna_dps:,.2f}")
         print()
-        print(f"Odette Total Damage:        {odette_rotation_damage:,.2f}")
+        print(f"Odette Rotation Damage:     {odette_rotation_damage:,.2f}")
         print(f"Odette DPS:                 {odette_dps:,.2f}")
         print()
+        print(f"Lumine Rotation Damage:     {lumine_rotation_damage:,.2f}")
         print(f"Lumine DPS:                 {lumine_dps:,.2f}")
-        print(f"Anastasya Rotation Damage:       {anastasya_rotation_damage:,.2f}")
-        print(f"Anastasya E-Skill Cryo on-field: {anastasya_e_skill_cryo_damage_on_field:,.2f}")
-        print(f"Anastasya E-Skill Cryo off-field:{anastasya_e_skill_cryo_damage_off_field:,.2f}")
-        print(f"Anastasya E-Skill Stellar:       {anastasya_e_skill_stellar_damage_off_field:,.2f}")
-        print(f"Anastasya Q Cryo on-field:       {anastasya_ultimate_q_cryo_damage_on_field:,.2f}")
-        print(f"Anastasya Q Stellar:             {anastasya_ultimate_q_stellar_damage:,.2f}")
-        print(f"Anastasya Q off-field tick:      {anastasya_ultimate_q_stellar_damage_off_field_tick_damage:,.2f}")
+        print()
+        print(f"Anastasya Rotation Damage:  {anastasya_rotation_damage:,.2f}")
         print(f"Anastasya DPS:              {anastasya_dps:,.2f}")
+        print()
         print(f"Diona DPS:                  {diona_dps_value:,.2f}")
         print(f"Faruzan DPS:                {faruzan_dps_value:,.2f}")
         print(f"Sucrose DPS:                {sucrose_dps_value:,.2f}")
